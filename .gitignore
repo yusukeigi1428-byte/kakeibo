@@ -1,0 +1,4 @@
+# 家計の実データは入れない
+*.json
+!manifest.webmanifest
+*.csv
