@@ -400,7 +400,7 @@ function normalizeState(s) {
   const out = {
     version: 2,
     owners: Array.isArray(s.owners) && s.owners.length ? s.owners.map(String) : d.owners,
-    accounts: Array.isArray(s.accounts) ? s.accounts.filter(a => a && a.id && a.name).map(a => ({ id: String(a.id), name: String(a.name), owner: String(a.owner || '') })) : [],
+    accounts: Array.isArray(s.accounts) ? s.accounts.filter(a => a && a.id && a.name).map(a => ({ id: String(a.id), name: String(a.name), owner: String(a.owner || ''), sweep: !!a.sweep })) : [],
     methods: Array.isArray(s.methods) && s.methods.length ? s.methods.filter(m => m && m.id && m.name).map(m => ({ id: String(m.id), name: String(m.name), accountId: String(m.accountId || ''), cash: !!m.cash })) : d.methods,
     months: {},
     tx: Array.isArray(s.tx) ? s.tx.filter(t => t && validDate(t.date) && Number(t.amount) > 0).map(t => ({ id: String(t.id || uid()), date: t.date, amount: Math.round(+t.amount), item: String(t.item || 'その他'), memo: String(t.memo || '') })) : []
@@ -482,17 +482,17 @@ function accountDebits(m, accId) {
   return { items, total: sum(items.map(i => i.amount)) };
 }
 const ceil1000 = v => v > 0 ? Math.ceil(v / 1000) * 1000 : 0;
-function suggestMove(diff) {
-  if (diff > 0) return Math.ceil(diff / 1000) * 1000;      // 足りない分は千円単位で切り上げて入金
-  if (diff < 0) return -Math.floor(-diff / 1000) * 1000;   // 余る分は必要額を割らないよう千円単位で出金
-  return 0;
+function suggestMove(diff, sweep) {
+  if (diff > 0) return Math.ceil(diff / 1000) * 1000;                // 足りない分は千円単位で切り上げて入金
+  if (diff < 0 && sweep) return -Math.floor(-diff / 1000) * 1000;    // 給与口座などは、必要額を割らないよう千円単位で余りを出金
+  return 0;                                                          // 貯金用の口座などは、余っていても出金しない
 }
 function moveInfo(m, acc) {
   const mv = m.moves[acc.id] || { before: null, need: null, amount: null, done: false, memo: '' };
   const deb = accountDebits(m, acc.id);
   const autoNeed = ceil1000(deb.total);
   const need = mv.need ?? autoNeed;
-  const suggestion = mv.before === null ? null : suggestMove(need - mv.before);
+  const suggestion = mv.before === null ? null : suggestMove(need - mv.before, acc.sweep);
   const amount = mv.amount ?? suggestion;
   const after = mv.before === null || amount === null ? null : mv.before + amount;
   return { mv, deb, autoNeed, need, suggestion, amount, after };
@@ -511,10 +511,8 @@ function createMonth(mk, fromKey) {
   if (src) {
     for (const s of SECTIONS) nm[s.key] = src[s.key].map(i => ({ ...i, id: uid(), done: false }));
     for (const [aid, mv] of Object.entries(src.moves)) {
-      const acc = accountById(aid);
-      const info = acc ? moveInfo(src, acc) : null;
-      // 必要額を手で決めていた口座はそのまま引き継ぐ。移動前残高は前月の移動後を目安に入れておく
-      nm.moves[aid] = { before: info && info.after !== null ? info.after : null, need: mv.need, amount: null, done: false, memo: '' };
+      // 手で決めていた必要額・移動額（毎月の児童手当の入金など）は引き継ぐ。残高は毎月入れ直す
+      nm.moves[aid] = { before: null, need: mv.need, amount: mv.amount, done: false, memo: '' };
     }
   }
   state.months[mk] = nm;
@@ -714,6 +712,8 @@ function renderAccounts() {
     return;
   }
   const infos = state.accounts.map(a => ({ a, ...moveInfo(m, a) }));
+  const prevKey = latestMonthBefore(viewMonth);
+  const prevAfter = a => { if (!prevKey) return null; const pm = state.months[prevKey]; return pm.moves[a.id] ? moveInfo(pm, a).after : null; };
   const inSum = sum(infos.map(i => i.amount > 0 ? i.amount : 0));
   const outSum = sum(infos.map(i => i.amount < 0 ? -i.amount : 0));
   const t = monthTotals(m);
@@ -722,7 +722,7 @@ function renderAccounts() {
     '<div class="tile"><div class="label">入金の合計</div><div class="value" style="color:var(--in-text)">' + yen(inSum) + '</div></div>' +
     '<div class="tile"><div class="label">出金の合計</div><div class="value" style="color:var(--out-text)">' + yen(outSum) + '</div></div>' +
     '<div class="tile"><div class="label">手持ちで用意</div><div class="value">' + yen(t.cash) + '</div></div></div>' +
-    '<p class="note">移動済み ' + doneN + ' / ' + infos.length + '口座。必要額は、その口座から引き落とされる項目の合計を千円単位で切り上げた額です。移動する額は、移動後に必要額を下回らないよう千円単位で計算します。どちらも手で変えられます。</p></div>';
+    '<p class="note">移動済み ' + doneN + ' / ' + infos.length + '口座。移動前の残高を入れると、移動する額が千円単位で自動で出ます（手で変えられます）。</p></div>';
 
   for (const i of infos) {
     const dir = i.amount > 0 ? '<span class="dir in">↑ 入金</span>' : i.amount < 0 ? '<span class="dir out">↓ 出金</span>' : '';
@@ -732,12 +732,12 @@ function renderAccounts() {
       (i.a.owner && i.a.owner !== 'ー' ? '<span class="owner">' + esc(i.a.owner) + '</span>' : '') +
       '<button class="done-btn" data-act="done" aria-pressed="' + i.mv.done + '">' + (i.mv.done ? '✓ 移動済み' : '未') + '</button></div>' +
       '<div class="mv-grid">' +
-        '<label><span>移動前の残高</span><input type="text" inputmode="numeric" data-f="before" value="' + fmtInput(i.mv.before) + '" placeholder="入力"></label>' +
+        '<label><span>移動前の残高</span><input type="text" inputmode="numeric" data-f="before" value="' + fmtInput(i.mv.before) + '" placeholder="' + (prevAfter(i.a) !== null ? '先月の移動後 ' + nf.format(prevAfter(i.a)) : '入力') + '"></label>' +
         '<label><span>必要額 ' + (i.mv.need === null ? '<em class="auto-tag">自動</em>' : '<button type="button" class="reset-auto" data-reset="need">自動に戻す</button>') + '</span><input type="text" inputmode="numeric" data-f="need" value="' + fmtInput(i.need) + '"></label>' +
         '<label style="grid-column:1/-1"><span>移動する額（＋入金 / −出金）' + (i.mv.amount === null ? (i.suggestion === null ? '' : '<em class="auto-tag">自動</em>') : '<button type="button" class="reset-auto" data-reset="amount">自動に戻す</button>') + '</span><input type="text" inputmode="numeric" data-f="amount" value="' + (i.amount === null ? '' : fmtInput(i.amount)) + '" placeholder="残高を入れると自動で出ます"></label>' +
       '</div>' +
       '<div class="mv-result"><span class="lbl">移動後の残高</span><span class="num"><span class="val">' + (i.after === null ? '—' : yen(i.after)) + '</span>' + dir + '</span></div>' + short +
-      '<div class="mv-sub">' + debTxt + '</div></div>';
+      '<div class="mv-sub">' + debTxt + (i.a.sweep ? '<br>余ったお金は出金する口座' : '') + '</div></div>';
   }
   box.innerHTML = html;
 
@@ -926,7 +926,7 @@ function renderSettings() {
     '<div class="card"><h2>名義</h2><ul class="set-list">' + state.owners.map((o, i) => '<li><span class="grow">' + esc(o) + '</span><button class="btn small danger" data-del-owner="' + i + '">削除</button></li>').join('') + '</ul>' +
     '<form class="row" id="ownerForm"><input type="text" id="ownerName" maxlength="20" placeholder="例：夫、妻、子ども" aria-label="名義"><button class="btn" style="flex:0 0 auto;width:auto">追加</button></form></div>' +
 
-    '<div class="card"><h2>口座</h2><ul class="set-list">' + state.accounts.map((a, i) => '<li><span class="grow"><div>' + esc(a.name) + '</div><div class="sub">' + esc(a.owner || '名義なし') + '</div></span>' +
+    '<div class="card"><h2>口座</h2><ul class="set-list">' + state.accounts.map((a, i) => '<li><span class="grow"><div>' + esc(a.name) + '</div><div class="sub">' + esc(a.owner || '名義なし') + (a.sweep ? '・余りは出金' : '') + '</div></span>' +
       '<button class="btn small" data-up-acc="' + i + '"' + (i ? '' : ' disabled') + ' aria-label="上へ">↑</button><button class="btn small" data-edit-acc="' + i + '">編集</button></li>').join('') + '</ul>' +
     '<button class="btn" id="addAcc">＋ 口座を追加</button></div>' +
 
@@ -982,6 +982,7 @@ function editAccount(a) {
   openSheet(a ? '口座を編集' : '口座を追加',
     '<form id="accForm" autocomplete="off"><label class="field"><span>口座の名前</span><input type="text" id="aName" maxlength="40" value="' + esc(a ? a.name : '') + '" placeholder="例：ゆうちょ（引落用）"></label>' +
     '<label class="field"><span>名義</span><select id="aOwner">' + ownerOptions(a ? a.owner : '') + '</select></label>' +
+    '<label class="field"><span>必要額より多いとき</span><select id="aSweep"><option value="0"' + (a && a.sweep ? '' : ' selected') + '>そのまま残す（貯金用の口座など）</option><option value="1"' + (a && a.sweep ? ' selected' : '') + '>余りを出金する（給与が入る口座など）</option></select></label>' +
     '<div class="btn-col"><button class="btn primary">保存する</button>' + (a ? '<button type="button" class="btn danger" id="aDel">この口座を削除</button>' : '') + '<button type="button" class="btn" id="aCancel">キャンセル</button></div></form>');
   $('aCancel').addEventListener('click', () => closeSheet());
   if (a) $('aDel').addEventListener('click', async () => {
@@ -995,8 +996,9 @@ function editAccount(a) {
     e.preventDefault();
     const name = $('aName').value.trim();
     if (!name) { toast('口座の名前を入力してください'); return; }
-    if (a) { a.name = name; a.owner = $('aOwner').value; }
-    else state.accounts.push({ id: 'a_' + uid(), name, owner: $('aOwner').value });
+    const sweep = $('aSweep').value === '1';
+    if (a) { a.name = name; a.owner = $('aOwner').value; a.sweep = sweep; }
+    else state.accounts.push({ id: 'a_' + uid(), name, owner: $('aOwner').value, sweep });
     save(); closeSheet(); render();
   });
 }
