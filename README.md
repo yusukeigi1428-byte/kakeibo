@@ -64,6 +64,11 @@
 | `index.html` | アプリ本体（画面・処理すべて） |
 | `manifest.webmanifest` | ホーム画面に追加したときの名前・アイコン |
 | `sw.js` | オフラインで開けるようにするキャッシュ |
-| `icons/` | アプリのアイコン |
+| `icons/` | アプリのアイコン（Google の Material Symbols「account_balance_wallet」から作成） |
 
 `index.html` を更新したら、`sw.js` の `CACHE` の番号を上げてください（今は `kakeibo-v4`）。
+
+## アイコンについて
+
+画面とアプリのアイコンは、Google の [Material Symbols](https://fonts.google.com/icons)（Rounded、Apache License 2.0）を使っています。
+オフラインでも表示できるよう、アイコンの形のデータを `index.html` の中に入れています。
