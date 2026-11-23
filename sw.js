@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリ本体をキャッシュする。
 // index.html などを更新したら CACHE の番号を上げること。
-const CACHE = 'kakeibo-v17';
+const CACHE = 'kakeibo-v18';
 // Google Fonts は版を上げても消さずに使い回す
 const FONT_CACHE = 'kakeibo-fonts';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
