@@ -80,8 +80,8 @@ iPhone では、ホーム画面に追加したアプリと Safari でデータ�
 
 ## フォントについて
 
-- 文字：Google Fonts の Noto Sans JP（Medium 500・Bold 700）
-- 数字と記号（0〜9 , . ¥ − + %）：Google Fonts の Barlow（Medium 500・Bold 700）
+- 文字：Google Fonts の Noto Sans JP（本文は Regular 400、見出しと金額は SemiBold 600）
+- 数字と記号（0〜9 , . ¥ − + %）：Google Fonts の Barlow（Regular 400・Medium 500・SemiBold 600）
   - DIN 2014 は ParaType の有料フォントで Google Fonts にないため、DIN に近い Barlow を使っています
   - Google Fonts の `text=` 指定で数字と記号だけを読み込み、ほかの文字は Noto Sans JP で表示します
 - フォントは一度読み込むと `sw.js` が保存するので、オフラインでも同じ見た目で表示されます
