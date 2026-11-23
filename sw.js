@@ -1,6 +1,9 @@
 // オフラインでも開けるようにアプリ本体をキャッシュする。
 // index.html などを更新したら CACHE の番号を上げること。
-const CACHE = 'kakeibo-v11';
+const CACHE = 'kakeibo-v12';
+// Google Fonts は版を上げても消さずに使い回す
+const FONT_CACHE = 'kakeibo-fonts';
+const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const ASSETS = [
   './',
   './index.html',
@@ -18,14 +21,24 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== FONT_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 // ネットワーク優先：つながるときは最新版、つながらないときはキャッシュ
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  // フォント：キャッシュがあればそれを使い、なければ取りに行って保存する
+  if (FONT_HOSTS.includes(url.hostname)) {
+    e.respondWith(caches.open(FONT_CACHE).then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+      if (res.ok || res.type === 'opaque') c.put(e.request, res.clone());
+      return res;
+    }))));
+    return;
+  }
+  if (url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {

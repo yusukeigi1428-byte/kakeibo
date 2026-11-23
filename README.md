@@ -72,3 +72,11 @@
 
 画面とアプリのアイコンは、Google の [Material Symbols](https://fonts.google.com/icons)（Rounded、Apache License 2.0）を使っています。
 オフラインでも表示できるよう、アイコンの形のデータを `index.html` の中に入れています。
+
+## フォントについて
+
+- 文字：Google Fonts の Noto Sans JP（Medium 500・Bold 700）
+- 数字と記号（0〜9 , . ¥ − + %）：Google Fonts の Barlow（Medium 500・Bold 700）
+  - DIN 2014 は ParaType の有料フォントで Google Fonts にないため、DIN に近い Barlow を使っています
+  - Google Fonts の `text=` 指定で数字と記号だけを読み込み、ほかの文字は Noto Sans JP で表示します
+- フォントは一度読み込むと `sw.js` が保存するので、オフラインでも同じ見た目で表示されます
