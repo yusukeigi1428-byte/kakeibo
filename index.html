@@ -328,6 +328,43 @@ table.data .neg { color: var(--critical-text); }
 .acc-foot .grow { flex: 1; min-width: 0; }
 .warn-text { color: var(--critical-text); font-weight: 700; }
 .kind-ic { font-size: 18px; }
+/* ---------- v4: 中学生でもわかる振り分け ---------- */
+.flow { display: grid; gap: 4px; }
+.flow-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 16px; }
+.flow-row b { font-size: 20px; }
+.flow-row.total { border-top: 2px solid var(--text); margin-top: 6px; padding-top: 8px; font-size: 18px; font-weight: 800; }
+.flow-row.total b { font-size: 30px; }
+.flow-row b.neg { color: var(--critical-text); }
+.flow-bar { height: 12px; background: var(--track); border-radius: 6px; overflow: hidden; margin-bottom: 6px; }
+.flow-bar > div { height: 100%; border-radius: 6px; }
+.step { display: inline-flex; width: 24px; height: 24px; border-radius: 12px; background: var(--accent); color: #fff; font-size: 14px; align-items: center; justify-content: center; flex: none; }
+.srow { width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: 0; border-top: 1px solid var(--grid); padding: 10px 0; min-height: 52px; text-align: left; font-size: 15px; }
+.srow .grow, .sline .grow { flex: 1; min-width: 0; }
+.srow .n { display: block; }
+.srow small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .who { display: inline; margin-left: 6px; font-size: 12px; color: var(--text-2); background: var(--surface-2); border-radius: 999px; padding: 1px 7px; }
+.srow > .num { font-weight: 700; white-space: nowrap; }
+.srow > .num.zero { color: var(--muted); font-weight: 400; }
+.srow.indent, .sline.indent, .add-row.indent { padding-left: 18px; }
+.srow.indent .n { color: var(--text-2); font-size: 14px; }
+.sline { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--grid); padding: 8px 0; min-height: 48px; font-size: 14px; color: var(--text-2); }
+.add-row button + button { border-top: 1px solid var(--grid); }
+details.alloc { border-top: 1px solid var(--grid); }
+details.alloc:first-of-type { border-top: 0; }
+.alloc-sum { list-style: none; display: flex; align-items: center; gap: 4px; padding: 6px 0; min-height: 64px; cursor: pointer; }
+.alloc-sum::-webkit-details-marker { display: none; }
+.alloc-sum .alloc-main { flex: 1; min-width: 0; }
+.alloc-sum .alloc-main b { display: block; font-size: 16px; }
+.alloc-sum .alloc-main .verb { font-weight: 400; font-size: 14px; color: var(--text-2); }
+.alloc-sum .alloc-main small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloc-sum .alloc-amt { font-size: 18px; white-space: nowrap; }
+.alloc-sum .alloc-amt.done { color: var(--muted); text-decoration: line-through; }
+.alloc-sum .alloc-ic { width: 44px; text-align: center; font-size: 20px; }
+.alloc-sum::after { content: '›'; color: var(--muted); font-size: 20px; margin-left: 6px; transition: transform .15s; }
+details.alloc[open] > .alloc-sum::after { transform: rotate(90deg); }
+details.alloc[data-empty] .alloc-amt { color: var(--muted); font-weight: 400; }
+details.alloc > .items { margin: 0 0 8px 40px; }
+.tabbar ul { grid-template-columns: repeat(4, 1fr) !important; }
 </style>
 </head>
 <body>
@@ -342,7 +379,6 @@ table.data .neg { color: var(--critical-text); }
 
 <main>
   <section class="view active" id="view-plan" aria-label="今月"></section>
-  <section class="view" id="view-accounts" aria-label="口座の移動"></section>
   <section class="view" id="view-log" aria-label="使ったお金の記録"></section>
   <section class="view" id="view-trend" aria-label="推移"></section>
   <section class="view" id="view-settings" aria-label="設定"></section>
@@ -352,8 +388,6 @@ table.data .neg { color: var(--critical-text); }
   <ul>
     <li><button data-view="plan" aria-current="page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>今月</button></li>
-    <li><button data-view="accounts">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>移動</button></li>
     <li><button data-view="log" class="add-btn" aria-label="使ったお金を記録"><span class="plus" aria-hidden="true">＋</span></button></li>
     <li><button data-view="trend">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>推移</button></li>
@@ -578,43 +612,6 @@ function calc(mk) {
   return t;
 }
 
-// 口座ごとのお金の流れ
-function accountFlows(mk, acc) {
-  const m = state.months[mk];
-  const tag = k => i => ({ ...i, sec: k });
-  const income = m.income.filter(i => i.via === acc.id).map(tag('income'));
-  const out = ['fixed', 'variable'].flatMap(k => m[k].filter(i => i.via === acc.id).map(tag(k)));
-  const saving = m.saving.filter(i => i.via === acc.id).map(tag('saving'));
-  const cards = state.accounts.filter(c => c.kind === 'card' && c.payFrom === acc.id).map(c => ({ card: c, total: cardTotal(m, c.id) }));
-  return { income, out, saving, cards };
-}
-const ceil1000 = v => v > 0 ? Math.ceil(v / 1000) * 1000 : 0;
-function suggestMove(diff, sweep) {
-  if (diff > 0) return Math.ceil(diff / 1000) * 1000;                // 足りない分は千円単位で切り上げて入れる
-  if (diff < 0 && sweep) return -Math.floor(-diff / 1000) * 1000;    // 給与口座などは、必要額を割らないよう千円単位で余りを出す
-  return 0;
-}
-function moveInfo(mk, acc) {
-  const m = state.months[mk];
-  const mv = m.moves[acc.id] || { before: null, need: null, amount: null, done: false, memo: '' };
-  const f = accountFlows(mk, acc);
-  let needRaw, deposit = 0;
-  if (acc.kind === 'cash') {
-    needRaw = sum([...f.out, ...f.saving].map(i => i.amount));        // 現金で払う・取っておくお金
-  } else {
-    needRaw = sum(f.out.map(i => i.amount)) + sum(f.cards.map(c => c.total));   // 引き落とし
-    deposit = sum(f.saving.map(i => i.amount));                                  // この口座に貯めるお金
-  }
-  if (state.savingsAccount && state.savingsAccount === acc.id) { const c = calc(mk); deposit += c.toSav - c.fill; }
-  const autoNeed = ceil1000(needRaw);
-  const need = mv.need ?? autoNeed;
-  const before = mv.before ?? (acc.kind === 'cash' ? 0 : null);
-  const suggestion = before === null ? (deposit ? deposit : null) : suggestMove(need - before, acc.sweep) + deposit;
-  const amount = mv.amount ?? suggestion;
-  const after = before === null || amount === null ? null : before + amount;
-  return { mv, f, needRaw, autoNeed, need, deposit, suggestion, amount, after, before };
-}
-
 /* =========================================================
    月の作成（前月コピー＝固定費などの自動入力）
    ========================================================= */
@@ -656,11 +653,11 @@ $('monthLabel').addEventListener('click', () => { viewMonth = monthKey(new Date(
 
 function render() {
   calcCache.clear();
-  const showNav = ['plan', 'accounts', 'log'].includes(currentView);
+  const showNav = ['plan', 'log'].includes(currentView);
   $('prevMonth').style.visibility = $('nextMonth').style.visibility = showNav ? 'visible' : 'hidden';
   $('monthLabel').disabled = !showNav;
   $('monthLabel').textContent = showNav ? monthLabel(viewMonth) : (currentView === 'trend' ? '推移' : '設定');
-  ({ plan: renderPlan, accounts: renderAccounts, log: renderLog, trend: renderTrend, settings: renderSettings })[currentView]();
+  ({ plan: renderPlan, log: renderLog, trend: renderTrend, settings: renderSettings })[currentView]();
 }
 
 function noMonthCard(container) {
@@ -682,41 +679,81 @@ function renderPlan() {
   if (!m) { noMonthCard(box); return; }
   m.autoDone = m.autoDone || {};
   const t = calc(viewMonth);
-  const mode = getPref(MODE_KEY, 'account');
+  const out = t.fixed + t.variable + t.saving;
+  const rows = allocation(viewMonth);
+  const sav = accountById(state.savingsAccount);
 
   let html = '';
   const specials = SECTIONS.flatMap(s => m[s.key].filter(isSpecial));
   if (specials.length && viewMonth >= monthKey(new Date())) {
-    html += '<div class="card banner"><b>先月繰越と貯金の出し入れを自動にできます</b><p class="note" style="margin:4px 0 10px">「' + [...new Set(specials.map(i => i.name))].map(esc).join('」「') + '」を手で入れる代わりに、自動で計算する行に置き換えます。入っている金額は引き継ぎます。</p><button class="btn primary" id="toAuto">自動にする</button></div>';
+    html += '<div class="card banner"><b>「' + [...new Set(specials.map(i => i.name))].map(esc).join('」「') + '」を自動にできます</b><p class="note" style="margin:4px 0 10px">先月のあまり・貯金の出し入れを、下のボタンで自動で計算するようにします。入っている金額は引き継ぎます。</p><button class="btn primary" id="toAuto">自動にする</button></div>';
   }
-  html += summaryCard(t, m);
-  html += '<div class="mode-switch" role="group" aria-label="表示の切り替え"><button data-mode="account" aria-pressed="' + (mode === 'account') + '">口座ごと</button><button data-mode="section" aria-pressed="' + (mode === 'section') + '">区分ごと</button></div>';
-  html += mode === 'account' ? accountBlocks(m, t) : sectionBlocks(m, t);
+
+  // ---- 今月のお金（入ってくる − 分ける ＝ のこり）
+  const scale = Math.max(t.income, out, 1);
+  html += '<div class="card">' +
+    '<div class="flow num">' +
+      '<div class="flow-row"><span class="lbl">💰 入ってくる</span><b>' + yen(t.income) + '</b></div>' +
+      '<div class="flow-bar"><div style="width:' + (t.income / scale * 100) + '%;background:var(--c-fixed)"></div></div>' +
+      '<div class="flow-row"><span class="lbl">📤 口座に分ける</span><b>' + yen(out) + '</b></div>' +
+      '<div class="flow-bar"><div style="width:' + (out / scale * 100) + '%;background:var(--c-variable)"></div></div>' +
+      '<div class="flow-row total"><span class="lbl">＝ のこり</span><b class="' + (t.rest < 0 ? 'neg' : '') + '">' + yen(t.rest) + '</b></div>' +
+    '</div>' + settleBox(t, m, sav) +
+    '<details class="table-view"><summary>固定費・変動費・積立の合計を見る</summary><ul class="cascade num">' +
+      '<li><i class="swatch" style="background:var(--c-fixed)"></i><span class="lbl">固定費（毎月ほぼ同じ）</span><span>' + yen(t.fixed) + '</span></li>' +
+      '<li><i class="swatch" style="background:var(--c-variable)"></i><span class="lbl">変動費（月によって変わる）</span><span>' + yen(t.variable) + '</span></li>' +
+      '<li><i class="swatch" style="background:var(--c-saving)"></i><span class="lbl">積立（貯める）</span><span>' + yen(t.saving) + '</span></li>' +
+    '</ul></details></div>';
+
+  // ---- ① 入ってくるお金
+  html += '<div class="card"><h2><span class="step">1</span>入ってくるお金<span class="right num">' + yen(t.income) + '</span></h2><ul class="items">';
+  for (const i of m.income) html += simpleRow('income', i, [i.owner && i.owner !== 'ー' ? i.owner : '', accountById(i.via) ? accountLabel(accountById(i.via)) + 'に入る' : '', i.memo].filter(Boolean).join('・'));
+  if (t.carryIn) html += autoRowSimple('carry', '先月のあまり', t.carryIn, m.carryIn === null ? '先月「来月にまわす」にした分' : '');
+  if (t.fill) html += autoRowSimple('fill', '貯金から出す', t.fill, (sav ? accountLabel(sav) + 'から・' : '') + '足りない分');
+  html += '<li class="add-row"><button data-add="income">＋ 入ってくるお金を追加</button>' + (t.carryIn ? '' : '<button data-carry>＋ 先月のあまりを入れる</button>') + '</li></ul></div>';
+
+  // ---- ② 口座に分ける
+  const doneN = rows.filter(r => r.total && (m.moves[r.a.id] || {}).done).length;
+  const needN = rows.filter(r => r.total).length;
+  html += '<div class="card"><h2><span class="step">2</span>口座に分ける<span class="right num">' + yen(out) + '</span></h2>' +
+    '<p class="note" style="margin:-4px 0 6px">給料を、下の口座に分けます。分けたら ✓ を付けます。（' + doneN + ' / ' + needN + ' 完了）</p>';
+  // 払うものが1つもない口座（給料が入るだけの口座など）は出さない
+  for (const r of rows) if (r.own.length || r.cards.length || r.autoSav) html += allocRow(m, r, t);
+  const orphan = OUT_KEYS.flatMap(k => m[k].map(i => ({ ...i, sec: k }))).filter(i => !accountById(i.via) || (accountById(i.via).kind === 'card' && !accountById(accountById(i.via).payFrom)));
+  if (orphan.length) {
+    html += '<details class="alloc" open><summary class="alloc-sum"><span class="alloc-ic">❔</span><span class="alloc-main"><b>どの口座か決まっていない</b><small>タップして口座を選んでください</small></span><b class="num">' + yen(sum(orphan.map(i => effAmount(m, i)))) + '</b></summary><ul class="items">' +
+      orphan.map(i => simpleRow(i.sec, i, SEC[i.sec].label)).join('') + '</ul></details>';
+  }
+  html += '<ul class="items"><li class="add-row"><button data-add="fixed">＋ 払うもの・貯めるものを追加（口座を選ぶ）</button></li></ul></div>';
+
   html += '<div class="card"><label class="field" style="margin:0"><span>今月のメモ</span><textarea id="monthMemo" rows="3" placeholder="例：水道代は2か月に1回">' + esc(m.memo) + '</textarea></label></div>';
   html += '<div class="btn-col"><button class="btn danger" id="delMonth">' + monthLabel(viewMonth) + 'の計画を削除</button></div>';
-  box.innerHTML = html;
 
-  box.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { setPref(MODE_KEY, b.dataset.mode); renderPlan(); }));
-  box.querySelectorAll('.check[data-id]').forEach(b => b.addEventListener('click', () => {
-    const it = m[b.dataset.sec].find(x => x.id === b.dataset.id);
-    if (!it) return;
-    it.done = !it.done; save(); renderPlan();
+  // 開いていた口座は開いたままにする
+  const open = new Set([...box.querySelectorAll('details.alloc[open]')].map(d => d.dataset.acc));
+  box.innerHTML = html;
+  box.querySelectorAll('details.alloc[data-acc]').forEach(d => { if (open.has(d.dataset.acc)) d.open = true; });
+
+  box.querySelectorAll('[data-done-acc]').forEach(b => b.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    const id = b.dataset.doneAcc;
+    const mv = m.moves[id] = m.moves[id] || { before: null, need: null, amount: null, done: false, memo: '' };
+    mv.done = !mv.done; save(); renderPlan();
   }));
-  box.querySelectorAll('.check[data-auto]').forEach(b => b.addEventListener('click', () => { m.autoDone[b.dataset.auto] = !m.autoDone[b.dataset.auto]; save(); renderPlan(); }));
-  box.querySelectorAll('.item-main[data-id]').forEach(b => b.addEventListener('click', () => quickEdit(b.dataset.sec, b.dataset.id)));
-  box.querySelectorAll('.item-main[data-auto-edit]').forEach(b => b.addEventListener('click', () => autoEdit(b.dataset.autoEdit)));
+  box.querySelectorAll('.srow[data-id]').forEach(b => b.addEventListener('click', () => quickEdit(b.dataset.sec, b.dataset.id)));
+  box.querySelectorAll('.srow[data-auto-edit]').forEach(b => b.addEventListener('click', () => autoEdit(b.dataset.autoEdit)));
   box.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => editItem(b.dataset.add || null, null, b.dataset.acc || '')));
+  box.querySelectorAll('[data-carry]').forEach(b => b.addEventListener('click', () => autoEdit('carry')));
   box.querySelectorAll('[data-addbill]').forEach(b => b.addEventListener('click', () => {
     const card = accountById(b.dataset.addbill);
     m.variable.push({ id: uid(), name: card.name, owner: '', via: card.id, amount: 0, done: false, memo: '', bill: true });
     save(); renderPlan();
     quickEdit('variable', m.variable[m.variable.length - 1].id);
   }));
-  box.querySelectorAll('[data-goto-move]').forEach(b => b.addEventListener('click', () => showView('accounts')));
   box.querySelectorAll('[data-settle]').forEach(b => b.addEventListener('click', () => {
     const v = b.dataset.settle || null;
     m.leftover = v; save(); render();
-    toast(v === 'savings' ? '残りが0になるよう、貯金で自動調整します' : v === 'carry' ? '余った分は来月の「先月繰越」に入ります' : '調整をやめました');
+    toast(v === 'savings' ? '貯金で、のこりを0にします' : v === 'carry' ? 'あまった分は来月にまわします' : 'やめました');
   }));
   box.querySelectorAll('select[data-savacc]').forEach(sel => sel.addEventListener('change', () => { state.savingsAccount = sel.value; save(); render(); }));
   if ($('toAuto')) $('toAuto').addEventListener('click', () => {
@@ -727,185 +764,82 @@ function renderPlan() {
     }
     m.carryIn = carry ? carry : null;
     if (settle) m.leftover = 'savings';
-    save(); render(); toast('自動の計算に切り替えました');
+    save(); render(); toast('自動にしました');
   });
   $('monthMemo').addEventListener('change', e => { m.memo = e.target.value; save(); });
   $('delMonth').addEventListener('click', async () => {
-    if (!await confirmDanger(monthLabel(viewMonth) + 'の計画を削除しますか？', '項目と口座の移動がすべて消えます。使ったお金の記録は残ります。')) return;
+    if (!await confirmDanger(monthLabel(viewMonth) + 'の計画を削除しますか？', 'この月の項目がすべて消えます。使ったお金の記録は残ります。')) return;
     delete state.months[viewMonth]; save(); render();
   });
 }
 
-function summaryCard(t, m) {
-  const out = t.fixed + t.saving + t.variable;
-  const scale = Math.max(t.income, out, 1);
-  const segs = [['固定費', t.fixed, 'var(--c-fixed)'], ['変動費', t.variable, 'var(--c-variable)'], ['積立', t.saving, 'var(--c-saving)']];
-  if (t.rest > 0) segs.push(['残り', t.rest, 'var(--c-rest)']);
-  const bar = segs.filter(s => s[1] > 0).map(s => '<div style="width:' + (s[1] / scale * 100) + '%;background:' + s[2] + '" title="' + s[0] + ' ' + yen(s[1]) + '"></div>').join('');
-  const incomeMark = t.rest < 0 && t.income > 0 ? '<div class="income-mark" style="left:calc(' + (t.income / scale * 100) + '% - 1px)"><span>収入</span></div>' : '';
-  const status = t.rest < 0 ? '<span class="hero-status neg">⚠ 赤字</span>'
-    : m.leftover === 'savings' ? '<span class="hero-status pos">✓ 貯金で調整</span>'
-    : m.leftover === 'carry' && t.rest > 0 ? '<span class="hero-status pos">➡ 来月へ繰り越し</span>'
-    : '<span class="hero-status pos">✓ 黒字</span>';
-  return '<div class="card">' +
-    '<div class="hero-label">今月の残り（収入 − 固定費 − 変動費 − 積立）</div>' +
-    '<div><span class="hero-value num' + (t.rest < 0 ? ' neg' : '') + '">' + yen(t.rest) + '</span>' + status + '</div>' +
-    '<div class="seg-bar" role="img" aria-label="収入に対する内訳">' + bar + incomeMark + '</div>' +
-    '<div class="seg-scale num"><span>0</span><span>' + (t.rest < 0 ? '支出 ' + yen(out) : '収入 ' + yen(t.income)) + '</span></div>' +
-    '<ul class="cascade num">' +
-      '<li><span class="op"></span><span class="lbl">収入</span><b>' + yen(t.income) + '</b></li>' +
-      '<li><span class="op">−</span><i class="swatch" style="background:var(--c-fixed)"></i><span class="lbl">固定費</span><span>' + yen(t.fixed) + '</span></li>' +
-      '<li><span class="op">−</span><i class="swatch" style="background:var(--c-variable)"></i><span class="lbl">変動費</span><span>' + yen(t.variable) + '</span></li>' +
-      '<li><span class="op">−</span><i class="swatch" style="background:var(--c-saving)"></i><span class="lbl">積立</span><span>' + yen(t.saving) + '</span></li>' +
-      '<li class="total"><span class="op">＝</span><span class="lbl">残り</span><span class="' + (t.rest < 0 ? 'neg' : '') + '">' + yen(t.rest) + '</span></li>' +
-    '</ul>' + settleBox(t, m) +
-    '<div class="pills num"><span class="pill">💴 手持ちで用意 <b>' + yen(t.cash) + '</b></span>' +
-    '<span class="pill">✓ 済み <b>' + t.doneCount + '</b> / ' + t.count + '</span></div>' +
-    '</div>';
+// 口座ごとに「いくら入れるか」
+function allocation(mk) {
+  const m = state.months[mk];
+  const t = calc(mk);
+  return state.accounts.filter(a => a.kind !== 'card').map(a => {
+    const own = OUT_KEYS.flatMap(k => m[k].filter(i => i.via === a.id).map(i => ({ ...i, sec: k })));
+    const cards = state.accounts.filter(c => c.kind === 'card' && c.payFrom === a.id).map(c => ({ card: c, total: cardTotal(m, c.id), items: cardItems(m, c.id) }));
+    const autoSav = state.savingsAccount === a.id ? t.toSav : 0;
+    const total = sum(own.map(i => i.amount)) + sum(cards.map(c => c.total)) + autoSav;
+    const hasIncome = m.income.some(i => i.via === a.id);
+    return { a, own, cards, autoSav, total, hasIncome };
+  });
 }
 
-function settleBox(t, m) {
+function allocRow(m, r, t) {
+  const a = r.a;
+  const done = !!(m.moves[a.id] || {}).done;
+  const verb = a.kind === 'cash' ? '現金でおろす' : r.hasIncome ? 'に残しておく' : 'に入れる';
+  const names = [...r.own.map(i => i.name), ...r.cards.map(c => c.card.name), ...(r.autoSav ? ['貯金'] : [])];
+  let inner = '';
+  for (const i of r.own) inner += simpleRow(i.sec, i, [SEC[i.sec].label, i.owner && i.owner !== 'ー' && i.owner !== a.owner ? i.owner : '', i.memo].filter(Boolean).join('・'));
+  for (const c of r.cards) {
+    const bill = c.items.find(i => i.bill);
+    const bd = c.items.filter(i => !i.bill);
+    inner += bill
+      ? simpleRow('variable', bill, '請求の合計（明細の額を入れる）', { name: '💳 ' + c.card.name + 'の引き落とし', amount: bill.amount })
+      : '<li class="sline"><span class="grow">💳 ' + esc(c.card.name) + 'の引き落とし</span><button class="btn small" data-addbill="' + c.card.id + '">請求額を入れる</button></li>';
+    inner += bd.map(i => simpleRow(i.sec, i, 'カードで払う・' + SEC[i.sec].label, { indent: true, name: 'うち ' + i.name })).join('');
+    if (bill && bd.length) { const other = bill.amount - sum(bd.map(i => i.amount)); inner += '<li class="sline indent"><span class="grow">うち その他の買い物</span><span class="num' + (other < 0 ? ' warn-text' : '') + '">' + yen(other) + '</span></li>'; }
+    inner += '<li class="add-row indent"><button data-add="" data-acc="' + c.card.id + '">＋ ' + esc(c.card.name) + 'で払うものを追加</button></li>';
+  }
+  if (r.autoSav) inner += autoRowSimple('toSav', '貯金（あまった分）', r.autoSav, '自動');
+  inner += '<li class="add-row"><button data-add="" data-acc="' + a.id + '">＋ ' + esc(a.name) + 'から払うものを追加</button></li>';
+  return '<details class="alloc" data-acc="' + a.id + '"' + (r.total ? '' : ' data-empty') + '><summary class="alloc-sum">' +
+    (r.total ? '<button class="check" role="checkbox" aria-checked="' + done + '" aria-label="' + esc(a.name) + 'に分けた" data-done-acc="' + a.id + '"><i>✓</i></button>' : '<span class="check"></span>') +
+    '<span class="alloc-main"><b>' + KIND[a.kind].icon + ' ' + esc(accountLabel(a)) + ' <span class="verb">' + verb + '</span></b>' +
+    '<small>' + (names.length ? esc(names.join('・')) : 'なし') + '</small></span>' +
+    '<b class="num alloc-amt' + (done ? ' done' : '') + '">' + yen(r.total) + '</b></summary>' +
+    '<ul class="items">' + inner + '</ul></details>';
+}
+
+function simpleRow(sec, it, sub, o) {
+  o = o || {};
+  const name = o.name || it.name || '（名前なし）';
+  const amt = o.amount !== undefined ? o.amount : it.amount;
+  return '<li><button class="srow' + (o.indent ? ' indent' : '') + '" data-sec="' + sec + '" data-id="' + it.id + '"><span class="grow"><span class="n">' + esc(name) + (it.owner && it.owner !== 'ー' && !String(sub).includes(it.owner) ? '<small class="who">' + esc(it.owner) + '</small>' : '') + '</span>' +
+    (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span><span class="num' + (amt ? '' : ' zero') + '">' + yen(amt) + '</span></button></li>';
+}
+function autoRowSimple(kind, name, amount, sub) {
+  return '<li><button class="srow" data-auto-edit="' + kind + '"><span class="grow"><span class="n">' + esc(name) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span><span class="num">' + yen(amount) + '</span></button></li>';
+}
+
+function settleBox(t, m, sav) {
   const banks = state.accounts.filter(a => a.kind === 'bank');
-  const savSel = banks.length && !state.savingsAccount
-    ? '<label class="field" style="margin:4px 0 0"><span>貯金用の口座を選ぶと、口座の移動にも自動で入ります</span><select data-savacc><option value="">選ばない</option>' + banks.map(a => '<option value="' + a.id + '">' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '';
-  if (m.leftover === 'savings') {
-    const line = t.fill ? '足りない ' + yen(t.fill) + ' を貯金から補填して、残りを ¥0 にしています'
-      : t.toSav ? '余った ' + yen(t.toSav) + ' を貯金に入れて、残りを ¥0 にしています' : '残りが出たら、貯金で自動調整します';
-    return '<div class="settle on"><div class="settle-row"><span>🏦 ' + line + '</span><button class="btn small" data-settle="">やめる</button></div>' + savSel + '</div>';
+  const savName = sav ? accountLabel(sav) : '貯金';
+  const savSel = banks.length && !sav
+    ? '<label class="field" style="margin:4px 0 0"><span>貯金はどの口座？</span><select data-savacc><option value="">選ばない</option>' + banks.map(a => '<option value="' + a.id + '">' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '';
+  if (m.leftover === 'savings' && (t.fill || t.toSav)) {
+    const line = t.fill ? savName + 'から ' + yen(t.fill) + ' 出して、のこりを0にしています' : 'あまった ' + yen(t.toSav) + ' を ' + savName + 'に入れます';
+    return '<div class="settle on"><div class="settle-row"><span>' + line + '</span><button class="btn small" data-settle="">やめる</button></div>' + savSel + '</div>';
   }
-  if (m.leftover === 'carry' && t.base >= 0) {
-    return '<div class="settle on"><div class="settle-row"><span>➡️ ' + yen(t.carryOut) + ' を来月に繰り越します（来月の「先月繰越」に自動で入ります）</span><button class="btn small" data-settle="">やめる</button></div></div>';
+  if (m.leftover === 'carry' && t.base > 0) {
+    return '<div class="settle on"><div class="settle-row"><span>あまった ' + yen(t.carryOut) + ' は来月にまわします</span><button class="btn small" data-settle="">やめる</button></div></div>';
   }
-  if (t.base < 0) return '<div class="settle warn"><div>⚠ ' + yen(-t.base) + ' 足りません</div><button class="btn primary" data-settle="savings">貯金から補填する</button></div>';
-  if (t.base > 0) return '<div class="settle"><div>' + yen(t.base) + ' 余ります。どうしますか？</div><div class="row"><button class="btn primary" data-settle="savings">貯金に入れる</button><button class="btn" data-settle="carry">来月に繰り越す</button></div></div>';
+  if (t.base < 0) return '<div class="settle warn"><div>⚠ ' + yen(-t.base) + ' たりません</div><button class="btn primary" data-settle="savings">' + esc(savName) + 'から出す</button>' + savSel + '</div>';
+  if (t.base > 0) return '<div class="settle"><div>' + yen(t.base) + ' あまります</div><div class="row"><button class="btn primary" data-settle="savings">' + esc(savName) + 'に入れる</button><button class="btn" data-settle="carry">来月にまわす</button></div>' + savSel + '</div>';
   return '';
-}
-
-function secTag(k) { return '<span class="tag"><i style="background:' + SEC[k].color + '"></i>' + SEC[k].label + '</span>'; }
-
-function itemRow(m, k, it, opts) {
-  opts = opts || {};
-  const spent = opts.spent || {};
-  const eff = effAmount(m, it);
-  const subParts = [];
-  if (it.owner && it.owner !== 'ー' && !opts.hideOwner) subParts.push(it.owner);
-  if (opts.showVia) subParts.push(viaName(it.via, it.owner));
-  if (it.bill) {
-    const bd = cardBreakdown(m, it.via);
-    subParts.push('請求の合計 ' + yen(it.amount) + (bd.length ? '（' + bd.map(i => i.name).join('・') + 'を除く）' : ''));
-  }
-  if (it.memo) subParts.push(it.memo);
-  let usage = '';
-  if (k === 'variable' && opts.hasLogs && !it.bill) {
-    const u = spent[varKey(it, m.variable)] || 0;
-    const over = u > it.amount;
-    usage = '<div class="usage"><div class="track"><div class="fill' + (over ? ' over' : '') + '" style="width:' + (it.amount ? Math.min(100, u / it.amount * 100) : (u ? 100 : 0)) + '%"></div></div>' +
-      '<div class="u num' + (over ? ' over' : '') + '">使った ' + yen(u) + '　' + (over ? '⚠ ' + yen(u - it.amount) + ' 超過' : '残り ' + yen(it.amount - u)) + '</div></div>';
-  }
-  const shown = opts.showBill ? it.amount : eff;
-  const name = it.bill && opts.showBill ? '請求額（合計）' : (it.name || '（名前なし）');
-  return { done: it.done, html: '<li class="item" data-done="' + it.done + '">' +
-    '<button class="check" role="checkbox" aria-checked="' + it.done + '" aria-label="' + esc(name) + 'を済みにする" data-sec="' + k + '" data-id="' + it.id + '"><i>✓</i></button>' +
-    '<button class="item-main" data-sec="' + k + '" data-id="' + it.id + '"><span class="t"><div class="n">' + esc(name) + (opts.tag ? secTag(k) : '') + '</div>' +
-    (subParts.length ? '<div class="s">' + esc(subParts.join('・')) + '</div>' : '') + usage + '</span>' +
-    '<span class="a num' + (shown ? '' : ' zero') + (shown < 0 ? ' warn-text' : '') + '">' + yen(shown) + '</span></button></li>' };
-}
-
-function autoRow(kind, name, amount, sub, tag, done) {
-  return { done, html: '<li class="item" data-done="' + done + '">' +
-    '<button class="check" role="checkbox" aria-checked="' + done + '" aria-label="' + name + 'を済みにする" data-auto="' + kind + '"><i>✓</i></button>' +
-    '<button class="item-main" data-auto-edit="' + kind + '"><span class="t"><div class="n">' + name + ' <em class="auto-tag">' + tag + '</em></div><div class="s">' + esc(sub) + '</div></span>' +
-    '<span class="a num' + (amount ? '' : ' zero') + '">' + yen(amount) + '</span></button></li>' };
-}
-function autoRows(m, t) {
-  const savAcc = accountById(state.savingsAccount);
-  const rows = [autoRow('carry', '先月繰越', t.carryIn, m.carryIn === null ? '自動：' + monthLabel(addMonths(viewMonth, -1)) + 'から繰り越し' : '手で入れた額（タップで変更）', m.carryIn === null ? '自動' : '手入力', !!m.autoDone.carry)];
-  if (t.fill) rows.push(autoRow('fill', '貯金から補填', t.fill, '自動：足りない分' + (savAcc ? '・' + accountLabel(savAcc) + 'から' : ''), '自動', !!m.autoDone.fill));
-  if (t.toSav) rows.push(autoRow('toSav', '貯金へ', t.toSav, '自動：余った分' + (savAcc ? '・' + accountLabel(savAcc) + 'へ' : ''), '自動', !!m.autoDone.toSav));
-  return rows;
-}
-
-// 口座ごとの表示
-function accountBlocks(m, t) {
-  const spent = spentByItem(viewMonth);
-  const hasLogs = Object.keys(spent).length > 0;
-  let html = '';
-  const auto = autoRows(m, t);
-  html += '<div class="card acc-card"><div class="acc-title"><span class="ic">🔁</span><h2>繰越・貯金での調整</h2><span class="right num"><b>' + yen(t.carryIn + t.fill - t.toSav) + '</b><small>収入への足し引き</small></span></div><ul class="items">' + auto.map(r => r.html).join('') + '</ul></div>';
-  for (const a of state.accounts) {
-    const f = accountFlows(viewMonth, a);
-    const rows = [];
-    let right = '', rightSub = '';
-    if (a.kind === 'card') {
-      const items = cardItems(m, a.id);
-      const bd = items.filter(i => !i.bill);
-      const bill = items.find(i => i.bill);
-      const total = cardTotal(m, a.id);
-      right = yen(total); rightSub = '今月の請求';
-      html += '<div class="card acc-card"><div class="acc-title"><span class="ic">' + KIND.card.icon + '</span><h2>' + esc(accountLabel(a)) + '</h2><span class="right num"><b>' + right + '</b><small>' + rightSub + '</small></span></div>';
-      html += '<div class="grp"><span>カードで払うもの（内訳）</span><span class="num">' + yen(sum(bd.map(i => i.amount))) + '</span></div><ul class="items">' +
-        bd.map(i => itemRow(m, i.sec, i, { tag: true, spent, hasLogs }).html).join('') + '</ul>';
-      if (bill) {
-        const other = bill.amount - sum(bd.map(i => i.amount));
-        html += '<div class="grp"><span>請求</span></div><ul class="items">' + itemRow(m, 'variable', bill, { showBill: true }).html +
-          '<li class="info-row"><span class="grow">その他の利用（請求 − 内訳）' + secTag('variable') + '</span><b class="num' + (other < 0 ? ' warn-text' : '') + '">' + yen(other) + '</b></li></ul>' +
-          (other < 0 ? '<p class="note warn-text">請求の合計が内訳より少なくなっています。請求額を確認してください。</p>' : '');
-      } else {
-        html += '<button class="btn" style="margin-top:8px" data-addbill="' + a.id + '">＋ 請求の合計を入れる</button>';
-      }
-      const pf = accountById(a.payFrom);
-      html += '<div class="acc-foot"><span class="grow">' + (pf ? '💳 ' + esc(accountLabel(pf)) + ' から <b class="num">' + yen(total) + '</b> 引き落とし' : '⚠ 引き落とし口座が未設定です（設定 → 口座）') + '</span></div>';
-      html += '<ul class="items"><li class="add-row"><button data-add="" data-acc="' + a.id + '">＋ このカードで払うものを追加</button></li></ul></div>';
-      continue;
-    }
-    for (const i of f.income) rows.push(itemRow(m, 'income', i, { tag: true, hideOwner: i.owner === a.owner }));
-    for (const i of f.out) rows.push(itemRow(m, i.sec, i, { tag: true, spent, hasLogs, hideOwner: i.owner === a.owner }));
-    for (const c of f.cards) rows.push({ done: false, html: '<li class="info-row"><span class="grow">💳 ' + esc(accountLabel(c.card)) + 'の引き落とし</span><b class="num">' + yen(c.total) + '</b></li>' });
-    for (const i of f.saving) rows.push(itemRow(m, 'saving', i, { tag: true, hideOwner: i.owner === a.owner }));
-    const info = moveInfo(viewMonth, a);
-    const inc = sum(f.income.map(i => i.amount));
-    if (a.kind === 'cash') { right = yen(info.needRaw); rightSub = '現金で用意'; }
-    else if (info.needRaw) { right = yen(info.needRaw); rightSub = '引き落とし'; }
-    else if (inc) { right = yen(inc); rightSub = '入ってくる'; }
-    else if (info.deposit) { right = yen(info.deposit); rightSub = '貯める'; }
-    else { right = '—'; rightSub = ''; }
-    let foot;
-    if (info.amount !== null && info.amount !== 0) foot = (info.amount > 0 ? (a.kind === 'cash' ? '↓ 引き出す ' : '↑ 入れる ') : '↑ 出す ') + '<b class="num">' + yen(Math.abs(info.amount)) + '</b>' + (info.after !== null ? '　→ 移動後 <b class="num">' + yen(info.after) + '</b>' : '');
-    else if (info.needRaw && info.mv.before === null && a.kind !== 'cash') foot = '必要額 <b class="num">' + yen(info.need) + '</b>　残高を入れると移動額が出ます';
-    else foot = info.mv.before !== null ? '移動なし' : '残高を入れると移動額が出ます';
-    html += '<div class="card acc-card"><div class="acc-title"><span class="ic">' + KIND[a.kind].icon + '</span><h2>' + esc(accountLabel(a)) + '</h2><span class="right num"><b>' + right + '</b><small>' + rightSub + '</small></span></div>' +
-      '<ul class="items">' + rows.map(r => r.html).join('') + '<li class="add-row"><button data-add="" data-acc="' + a.id + '">＋ この口座に追加</button></li></ul>' +
-      '<button class="acc-foot" data-goto-move><span class="grow">' + foot + (info.mv.done ? '　✓ 移動済み' : '') + '</span><span aria-hidden="true">›</span></button></div>';
-  }
-  const orphan = SECTIONS.flatMap(s => m[s.key].map(i => ({ ...i, sec: s.key }))).filter(i => !accountById(i.via));
-  if (orphan.length) {
-    html += '<div class="card acc-card"><div class="acc-title"><span class="ic">❔</span><h2>口座が決まっていない項目</h2></div><ul class="items">' +
-      orphan.map(i => itemRow(m, i.sec, i, { tag: true, spent, hasLogs }).html).join('') + '</ul><p class="note">タップして「名前・名義・口座を変える」から口座を選んでください。</p></div>';
-  }
-  return html;
-}
-
-// 区分ごとの表示
-function sectionBlocks(m, t) {
-  const spent = spentByItem(viewMonth);
-  const hasLogs = Object.keys(spent).length > 0;
-  let html = '';
-  const auto = autoRows(m, t);
-  for (const s of SECTIONS) {
-    const items = m[s.key];
-    const rows = [];
-    if (s.key === 'income') rows.push(auto[0]);
-    for (const it of items) rows.push(itemRow(m, s.key, it, { showVia: true, spent, hasLogs }));
-    if (s.key === 'income' && t.fill) rows.push(auto.find(r => r.html.includes('data-auto="fill"')));
-    if (s.key === 'saving' && t.toSav) rows.push(auto.find(r => r.html.includes('data-auto="toSav"')));
-    const doneN = rows.filter(r => r.done).length;
-    html += '<div class="card"><div class="sec-head"><i class="swatch" style="background:' + s.color + '"></i>' +
-      '<h2>' + s.label + '</h2><span class="total num">' + yen(t[s.key]) + '</span></div>' +
-      '<div class="sec-meta"><span>' + rows.length + '項目</span><span>済み ' + doneN + ' / ' + rows.length + '</span></div><ul class="items">' +
-      rows.map(r => r.html).join('') +
-      '<li class="add-row"><button data-add="' + s.key + '">＋ ' + s.label + 'を追加</button></li></ul></div>';
-  }
-  return html;
 }
 
 function itemNameSuggestions(secKey) {
@@ -1052,88 +986,6 @@ function autoEdit(kind) {
     '<div class="btn-col"><button class="btn primary" id="aOk">閉じる</button><button class="btn" id="aStop">貯金での調整をやめる</button></div>');
   $('aOk').addEventListener('click', () => { m.autoDone[kind] = $('aDone').checked; save(); closeSheet(); render(); });
   $('aStop').addEventListener('click', () => { m.leftover = null; save(); closeSheet(); render(); });
-}
-
-/* =========================================================
-   口座の移動
-   ========================================================= */
-function renderAccounts() {
-  const box = $('view-accounts');
-  const m = state.months[viewMonth];
-  if (!m) { noMonthCard(box); return; }
-  const list = state.accounts.filter(a => a.kind !== 'card');
-  if (!list.length) {
-    box.innerHTML = '<div class="card"><h2>口座がまだありません</h2><p class="note" style="margin:0 0 12px">「設定」で口座を登録すると、口座ごとに必要な額と移動する額が自動で出ます。</p><button class="btn primary" id="goSet">設定を開く</button></div>';
-    $('goSet').addEventListener('click', () => showView('settings'));
-    return;
-  }
-  const infos = list.map(a => ({ a, ...moveInfo(viewMonth, a) }));
-  const prevKey = latestMonthBefore(viewMonth);
-  const prevAfter = a => { if (!prevKey) return null; const pm = state.months[prevKey]; return pm.moves[a.id] ? moveInfo(prevKey, a).after : null; };
-  const inSum = sum(infos.map(i => i.amount > 0 ? i.amount : 0));
-  const outSum = sum(infos.map(i => i.amount < 0 ? -i.amount : 0));
-  const diff = outSum - inSum;
-  const doneN = infos.filter(i => i.mv.done).length;
-  let html = '<div class="card"><div class="move-sum num">' +
-    '<div class="tile"><div class="label">入れる合計</div><div class="value" style="color:var(--in-text)">' + yen(inSum) + '</div></div>' +
-    '<div class="tile"><div class="label">出す合計</div><div class="value" style="color:var(--out-text)">' + yen(outSum) + '</div></div>' +
-    '<div class="tile"><div class="label">差</div><div class="value' + (diff < 0 ? ' warn-text' : '') + '">' + yen(diff) + '</div></div></div>' +
-    '<p class="note">移動済み ' + doneN + ' / ' + infos.length + '。' + (diff < 0 ? '⚠ 出すお金より入れるお金が ' + yen(-diff) + ' 多く、足りません。' : diff > 0 ? '出したお金のうち ' + yen(diff) + ' が余ります。' : '') +
-    '残高を入れると、移動する額が千円単位で自動で出ます。± で入れる・出すを切り替えられます。</p></div>';
-
-  for (const i of infos) {
-    const cash = i.a.kind === 'cash';
-    const dir = i.amount > 0 ? '<span class="dir in">' + (cash ? '↓ 引き出す' : '↑ 入れる') + '</span>' : i.amount < 0 ? '<span class="dir out">' + (cash ? '↑ 口座へ戻す' : '↓ 出す') + '</span>' : '';
-    const short = i.after !== null && i.after < i.need ? '<div class="mv-warn">⚠ 必要額まで ' + yen(i.need - i.after) + ' 足りません</div>' : '';
-    const outs = [...i.f.out.map(x => x.name), ...i.f.cards.map(c => c.card.name)];
-    const lines = [];
-    if (cash) lines.push('現金で払う・取っておく ' + ([...i.f.out, ...i.f.saving].length) + '件 ' + yen(i.needRaw));
-    else if (outs.length) lines.push('引き落とし ' + outs.length + '件 ' + yen(i.needRaw) + '（' + outs.slice(0, 4).map(esc).join('・') + (outs.length > 4 ? '…' : '') + '）');
-    if (!cash && i.f.saving.length) lines.push('貯める ' + yen(sum(i.f.saving.map(x => x.amount))) + '（' + i.f.saving.map(x => esc(x.name)).join('・') + '）');
-    if (state.savingsAccount === i.a.id) { const c = calc(viewMonth); if (c.toSav) lines.push('貯金へ ' + yen(c.toSav) + '（自動）'); if (c.fill) lines.push('貯金から補填 ' + yen(c.fill) + '（自動）'); }
-    if (i.f.income.length) lines.push('入ってくる ' + yen(sum(i.f.income.map(x => x.amount))) + '（' + i.f.income.map(x => esc(x.name)).join('・') + '）');
-    if (i.a.sweep) lines.push('余ったお金は出す口座');
-    const pa = prevAfter(i.a);
-    html += '<div class="card" data-acc="' + i.a.id + '"><div class="acct-head"><span class="kind-ic">' + KIND[i.a.kind].icon + '</span><span class="nm">' + esc(accountLabel(i.a)) + '</span>' +
-      '<button class="done-btn" data-act="done" aria-pressed="' + i.mv.done + '">' + (i.mv.done ? '✓ 済み' : '未') + '</button></div>' +
-      '<div class="mv-grid">' +
-        '<label><span>' + (cash ? '今ある現金' : '移動前の残高') + '</span><input type="text" inputmode="numeric" data-f="before" value="' + fmtInput(i.mv.before) + '" placeholder="' + (pa !== null ? '先月の移動後 ' + nf.format(pa) : (cash ? '0' : '入力')) + '"></label>' +
-        '<label><span>必要額 ' + (i.mv.need === null ? '<em class="auto-tag">自動</em>' : '<button type="button" class="reset-auto" data-reset="need">自動に戻す</button>') + '</span><input type="text" inputmode="numeric" data-f="need" value="' + fmtInput(i.need) + '"></label>' +
-        '<div class="cell" style="grid-column:1/-1"><span>' + (cash ? '引き出す額（＋引き出す / −戻す）' : '移動する額（＋入れる / −出す）') + (i.mv.amount === null ? (i.suggestion === null ? '' : '<em class="auto-tag">自動</em>') : '<button type="button" class="reset-auto" data-reset="amount">自動に戻す</button>') + '</span>' +
-          '<div class="amt-row"><button type="button" class="sign-btn" data-act="sign" aria-label="入れると出すを切り替える">±</button><input type="text" inputmode="numeric" data-f="amount" value="' + (i.amount === null ? '' : fmtInput(i.amount)) + '" placeholder="残高を入れると自動で出ます" aria-label="移動する額"></div></div>' +
-      '</div>' +
-      '<div class="mv-result"><span class="lbl">移動後</span><span class="num"><span class="val">' + (i.after === null ? '—' : yen(i.after)) + '</span>' + dir + '</span></div>' + short +
-      '<div class="mv-sub">' + (lines.join('<br>') || 'この口座で動くお金はありません') + '</div></div>';
-  }
-  box.innerHTML = html;
-
-  box.querySelectorAll('.card[data-acc]').forEach(card => {
-    const aid = card.dataset.acc;
-    const get = () => (m.moves[aid] = m.moves[aid] || { before: null, need: null, amount: null, done: false, memo: '' });
-    card.querySelectorAll('input[data-f]').forEach(inp => {
-      attachAmountFormatter(inp, true);
-      inp.addEventListener('change', () => {
-        const f = inp.dataset.f;
-        const raw = inp.value.trim();
-        const n = raw === '' || raw === '-' ? null : parseAmount(raw);
-        if (n !== null && !Number.isFinite(n)) { toast('数字で入力してください'); inp.value = ''; return; }
-        const mv = get();
-        if (f === 'before') mv.before = n;
-        if (f === 'need') { const info = moveInfo(viewMonth, accountById(aid)); mv.need = n === null || n === info.autoNeed ? null : n; }
-        if (f === 'amount') { const info = moveInfo(viewMonth, accountById(aid)); mv.amount = n === null || n === info.suggestion ? null : n; }
-        save(); renderAccounts();
-      });
-    });
-    card.querySelectorAll('[data-reset]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); get()[b.dataset.reset] = null; save(); renderAccounts(); }));
-    card.querySelector('[data-act="done"]').addEventListener('click', () => { const mv = get(); mv.done = !mv.done; save(); renderAccounts(); });
-    card.querySelector('[data-act="sign"]').addEventListener('click', () => {
-      const mv = get();
-      const info = moveInfo(viewMonth, accountById(aid));
-      const n = -(info.amount || 0);
-      mv.amount = n === info.suggestion ? null : n;
-      save(); renderAccounts();
-    });
-  });
 }
 
 /* =========================================================
@@ -1295,14 +1147,14 @@ function renderSettings() {
   const box = $('view-settings');
   const banks = state.accounts.filter(a => a.kind === 'bank');
   box.innerHTML =
-    '<div class="card"><h2>口座</h2><p class="note" style="margin:-4px 0 8px">項目はすべて、ここに登録した口座（銀行口座・現金・カード）につなぎます。並び順は「今月」の口座ごとの表示の順になります。</p><ul class="set-list">' +
+    '<div class="card"><h2>口座</h2><p class="note" style="margin:-4px 0 8px">払うものは、どれもこの中のどれかの口座から払います。カードは「どの口座から引き落とされるか」を決めておきます。並び順は「今月」の表示の順です。</p><ul class="set-list">' +
       state.accounts.map((a, i) => {
-        const sub = [KIND[a.kind].label, a.owner || '', a.kind === 'bank' && a.sweep ? '余りは出す' : '', a.kind === 'card' ? (accountById(a.payFrom) ? accountLabel(accountById(a.payFrom)) + 'から引き落とし' : '⚠ 引き落とし口座が未設定') : '', state.savingsAccount === a.id ? '貯金用' : ''].filter(Boolean).join('・');
+        const sub = [KIND[a.kind].label, a.owner || '', a.kind === 'card' ? (accountById(a.payFrom) ? accountLabel(accountById(a.payFrom)) + 'から引き落とし' : '⚠ 引き落とし口座が未設定') : '', state.savingsAccount === a.id ? '貯金用' : ''].filter(Boolean).join('・');
         return '<li><span class="kind-ic">' + KIND[a.kind].icon + '</span><span class="grow"><div>' + esc(accountLabel(a)) + '</div><div class="sub">' + esc(sub) + '</div></span>' +
           '<button class="btn small" data-up-acc="' + i + '"' + (i ? '' : ' disabled') + ' aria-label="上へ">↑</button><button class="btn small" data-edit-acc="' + i + '">編集</button></li>';
       }).join('') + '</ul>' +
     '<button class="btn" id="addAcc">＋ 口座を追加</button>' +
-    (banks.length ? '<label class="field" style="margin:14px 0 0"><span>貯金用の口座（「貯金に入れる」「貯金から補填」を、この口座の入れる・出すとして移動に入れます）</span><select data-savacc><option value="">設定しない</option>' + banks.map(a => '<option value="' + a.id + '"' + (a.id === state.savingsAccount ? ' selected' : '') + '>' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '') + '</div>' +
+    (banks.length ? '<label class="field" style="margin:14px 0 0"><span>貯金の口座（のこりを「貯金に入れる」「貯金から出す」ときに使います）</span><select data-savacc><option value="">設定しない</option>' + banks.map(a => '<option value="' + a.id + '"' + (a.id === state.savingsAccount ? ' selected' : '') + '>' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '') + '</div>' +
 
     '<div class="card"><h2>名義</h2><ul class="set-list">' + state.owners.map((o, i) => '<li><span class="grow">' + esc(o) + '</span><button class="btn small danger" data-del-owner="' + i + '">削除</button></li>').join('') + '</ul>' +
     '<form class="row" id="ownerForm"><input type="text" id="ownerName" maxlength="20" placeholder="例：夫、妻、子" aria-label="名義"><button class="btn" style="flex:0 0 auto;width:auto">追加</button></form></div>' +
@@ -1359,7 +1211,7 @@ function editAccount(a) {
     '<label class="field" id="aSweepWrap"><span>必要額より多いとき</span><select id="aSweep"><option value="0"' + (a && a.sweep ? '' : ' selected') + '>そのまま残す（貯金用の口座など）</option><option value="1"' + (a && a.sweep ? ' selected' : '') + '>余りを出す（給与が入る口座など）</option></select></label>' +
     '<label class="field" id="aPayWrap"><span>引き落とし口座</span><select id="aPay"><option value="">未設定</option>' + banks.map(b => '<option value="' + b.id + '"' + (a && a.payFrom === b.id ? ' selected' : '') + '>' + esc(accountLabel(b)) + '</option>').join('') + '</select></label>' +
     '<div class="btn-col"><button class="btn primary">保存する</button>' + (a ? '<button type="button" class="btn danger" id="aDel">この口座を削除</button>' : '') + '<button type="button" class="btn" id="aCancel">キャンセル</button></div></form>');
-  const sync = () => { const k = $('aKind').value; $('aSweepWrap').hidden = k !== 'bank'; $('aPayWrap').hidden = k !== 'card'; };
+  const sync = () => { const k = $('aKind').value; $('aSweepWrap').hidden = true; $('aPayWrap').hidden = k !== 'card'; };
   $('aKind').addEventListener('change', sync); sync();
   $('aCancel').addEventListener('click', () => closeSheet());
   if (a) $('aDel').addEventListener('click', async () => {
