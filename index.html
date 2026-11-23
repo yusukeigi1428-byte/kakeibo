@@ -276,6 +276,21 @@ table.data th { color: var(--text-2); font-weight: 600; }
 table.data a { color: var(--accent); }
 table.data .neg { color: var(--critical-text); }
 
+.banner { border-color: var(--accent); }
+.settle { background: var(--surface-2); border-radius: 12px; padding: 12px; margin-top: 12px; display: grid; gap: 10px; font-size: 14px; }
+.settle.warn { box-shadow: inset 4px 0 0 var(--critical); }
+.settle.warn > div:first-child { color: var(--critical-text); font-weight: 700; }
+.settle.on { box-shadow: inset 4px 0 0 var(--good-text); }
+.settle-row { display: flex; align-items: center; gap: 10px; }
+.settle-row > span { flex: 1; min-width: 0; }
+.sheet-sub { margin: -6px 0 12px !important; font-size: 13px !important; color: var(--muted) !important; }
+.check-row { display: flex; align-items: center; gap: 10px; min-height: 48px; font-size: 15px; margin-bottom: 8px; }
+.check-row input { width: 22px; height: 22px; accent-color: var(--check); margin: 0; }
+.mv-grid .cell > span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); margin-bottom: 4px; }
+.amt-row { display: flex; gap: 8px; }
+.amt-row input { flex: 1; min-width: 0; }
+.sign-btn { flex: none; width: 52px; min-height: 46px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); font-size: 20px; font-weight: 700; }
+
 /* ---------- Bottom nav ---------- */
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
 .tabbar ul { display: grid; grid-template-columns: repeat(5, 1fr); max-width: 640px; margin: 0 auto; padding: 0; list-style: none; }
@@ -357,6 +372,7 @@ function defaultState() {
     version: 2,
     owners: ['共通'],
     accounts: [],
+    savingsAccount: '',
     methods: [
       { id: 'm_cash', name: '手持ち', accountId: '', cash: true },
       { id: 'm_transfer', name: '振込', accountId: '', cash: false },
@@ -383,6 +399,7 @@ function loadState() {
   return defaultState();
 }
 function save() {
+  calcCache.clear();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); storageOk = true; }
   catch (e) { storageOk = false; toast('保存できませんでした。ブラウザの設定を確認してください'); }
 }
@@ -400,6 +417,7 @@ function normalizeState(s) {
   const out = {
     version: 2,
     owners: Array.isArray(s.owners) && s.owners.length ? s.owners.map(String) : d.owners,
+    savingsAccount: String(s.savingsAccount || ''),
     accounts: Array.isArray(s.accounts) ? s.accounts.filter(a => a && a.id && a.name).map(a => ({ id: String(a.id), name: String(a.name), owner: String(a.owner || ''), sweep: !!a.sweep })) : [],
     methods: Array.isArray(s.methods) && s.methods.length ? s.methods.filter(m => m && m.id && m.name).map(m => ({ id: String(m.id), name: String(m.name), accountId: String(m.accountId || ''), cash: !!m.cash })) : d.methods,
     months: {},
@@ -408,7 +426,7 @@ function normalizeState(s) {
   if (s.months && typeof s.months === 'object') {
     for (const [mk, m] of Object.entries(s.months)) {
       if (!/^\d{4}-\d{2}$/.test(mk) || !m) continue;
-      const nm = { moves: {}, memo: String(m.memo || '') };
+      const nm = { moves: {}, memo: String(m.memo || ''), leftover: ['savings', 'carry'].includes(m.leftover) ? m.leftover : null, carryIn: numOrNull(m.carryIn), autoDone: { carry: !!(m.autoDone && m.autoDone.carry), fill: !!(m.autoDone && m.autoDone.fill), toSav: !!(m.autoDone && m.autoDone.toSav) } };
       for (const sec of SECTIONS) {
         nm[sec.key] = Array.isArray(m[sec.key]) ? m[sec.key].filter(it => it && it.name !== undefined).map(it => ({
           id: String(it.id || uid()), name: String(it.name), owner: String(it.owner || ''), via: String(it.via || ''),
@@ -458,22 +476,45 @@ const sum = arr => arr.reduce((a, b) => a + b, 0);
 const methodById = id => state.methods.find(m => m.id === id);
 const accountById = id => state.accounts.find(a => a.id === id);
 function accountLabel(a) { return a.name + (a.owner && a.owner !== 'ー' ? '・' + a.owner : ''); }
-function viaName(secKey, via) {
+function viaName(secKey, via, owner) {
   if (!via) return '';
-  if (secKey === 'income') { const a = accountById(via); return a ? accountLabel(a) : ''; }
+  if (secKey === 'income') { const a = accountById(via); return a ? (owner && a.owner === owner ? a.name : accountLabel(a)) : ''; }
   const m = methodById(via); return m ? m.name : '';
 }
 
-function monthTotals(m) {
-  const t = {};
-  for (const s of SECTIONS) t[s.key] = sum(m[s.key].map(i => i.amount));
+// 先月繰越・貯金での調整は自動で計算する（シートで手入力していた「先月繰越」「貯蓄から補填」「貯金口座へ」の代わり）
+const SPECIAL_NAMES = ['先月繰越', '貯蓄から補填', '貯金から補填', '貯金口座へ', '貯金へ'];
+const isSpecial = it => SPECIAL_NAMES.includes(it.name);
+const calcCache = new Map();
+function calc(mk) {
+  if (calcCache.has(mk)) return calcCache.get(mk);
+  const m = state.months[mk];
+  if (!m) return null;
+  const base = {};
+  for (const s of SECTIONS) base[s.key] = sum(m[s.key].map(i => i.amount));
+  const pk = addMonths(mk, -1);
+  const carryAuto = state.months[pk] ? calc(pk).carryOut : 0;
+  const carryIn = m.carryIn ?? carryAuto;
+  const b = base.income + carryIn - base.fixed - base.saving - base.variable;   // 貯金で調整する前の残り
+  const t = { carryAuto, carryIn, base: b };
+  t.fill = m.leftover === 'savings' && b < 0 ? -b : 0;      // 足りない分を貯金から補填
+  t.toSav = m.leftover === 'savings' && b > 0 ? b : 0;      // 余った分を貯金へ
+  t.carryOut = m.leftover === 'carry' && b > 0 ? b : 0;     // 余った分を来月へ
+  t.income = base.income + carryIn + t.fill;
+  t.fixed = base.fixed;
+  t.saving = base.saving + t.toSav;
+  t.variable = base.variable;
   t.a = t.income - t.fixed;          // ① 収入 − 固定費
   t.b = t.a - t.saving;              // ② ① − 積立
   t.rest = t.b - t.variable;         // 残り
-  t.cash = sum(['fixed', 'saving', 'variable'].flatMap(k => m[k]).filter(i => { const me = methodById(i.via); return me && me.cash; }).map(i => i.amount));
+  const cashItems = ['fixed', 'saving', 'variable'].flatMap(k => m[k]).filter(i => { const me = methodById(i.via); return me && me.cash; });
+  t.cash = sum(cashItems.map(i => i.amount));
+  const ad = m.autoDone || {};
+  const autos = [['carry', true], ['fill', t.fill > 0], ['toSav', t.toSav > 0]].filter(x => x[1]).map(x => x[0]);
   const all = SECTIONS.flatMap(s => m[s.key]);
-  t.doneCount = all.filter(i => i.done).length;
-  t.count = all.length;
+  t.count = all.length + autos.length;
+  t.doneCount = all.filter(i => i.done).length + autos.filter(k => ad[k]).length;
+  calcCache.set(mk, t);
   return t;
 }
 // 口座ごとの引落合計（支払い方法がその口座に結びついている項目）
@@ -487,15 +528,19 @@ function suggestMove(diff, sweep) {
   if (diff < 0 && sweep) return -Math.floor(-diff / 1000) * 1000;    // 給与口座などは、必要額を割らないよう千円単位で余りを出金
   return 0;                                                          // 貯金用の口座などは、余っていても出金しない
 }
-function moveInfo(m, acc) {
+function moveInfo(mk, acc) {
+  const m = state.months[mk];
   const mv = m.moves[acc.id] || { before: null, need: null, amount: null, done: false, memo: '' };
   const deb = accountDebits(m, acc.id);
   const autoNeed = ceil1000(deb.total);
   const need = mv.need ?? autoNeed;
-  const suggestion = mv.before === null ? null : suggestMove(need - mv.before, acc.sweep);
+  // 貯金用の口座には「貯金へ」を入金、「貯金から補填」を出金として足す
+  let extra = 0;
+  if (state.savingsAccount && state.savingsAccount === acc.id) { const c = calc(mk); extra = c.toSav - c.fill; }
+  const suggestion = mv.before === null ? (extra ? extra : null) : suggestMove(need - mv.before, acc.sweep) + extra;
   const amount = mv.amount ?? suggestion;
   const after = mv.before === null || amount === null ? null : mv.before + amount;
-  return { mv, deb, autoNeed, need, suggestion, amount, after };
+  return { mv, deb, autoNeed, need, suggestion, amount, after, extra };
 }
 
 /* =========================================================
@@ -506,10 +551,12 @@ function latestMonthBefore(mk) {
   return keys.length ? keys[keys.length - 1] : null;
 }
 function createMonth(mk, fromKey) {
-  const nm = { income: [], fixed: [], saving: [], variable: [], moves: {}, memo: '' };
+  const nm = { income: [], fixed: [], saving: [], variable: [], moves: {}, memo: '', leftover: null, carryIn: null, autoDone: {} };
   const src = fromKey && state.months[fromKey];
   if (src) {
-    for (const s of SECTIONS) nm[s.key] = src[s.key].map(i => ({ ...i, id: uid(), done: false }));
+    // 先月繰越・貯金の出し入れは自動の行で計算するのでコピーしない
+    for (const s of SECTIONS) nm[s.key] = src[s.key].filter(i => !isSpecial(i)).map(i => ({ ...i, id: uid(), done: false }));
+    nm.leftover = src.leftover || null;
     for (const [aid, mv] of Object.entries(src.moves)) {
       // 手で決めていた必要額・移動額（毎月の児童手当の入金など）は引き継ぐ。残高は毎月入れ直す
       nm.moves[aid] = { before: null, need: mv.need, amount: mv.amount, done: false, memo: '' };
@@ -540,6 +587,7 @@ $('nextMonth').addEventListener('click', () => { viewMonth = addMonths(viewMonth
 $('monthLabel').addEventListener('click', () => { viewMonth = monthKey(new Date()); render(); });
 
 function render() {
+  calcCache.clear();
   const showNav = ['plan', 'accounts', 'log'].includes(currentView);
   $('prevMonth').style.visibility = $('nextMonth').style.visibility = showNav ? 'visible' : 'hidden';
   $('monthLabel').disabled = !showNav;
@@ -564,7 +612,8 @@ function renderPlan() {
   const box = $('view-plan');
   const m = state.months[viewMonth];
   if (!m) { noMonthCard(box); return; }
-  const t = monthTotals(m);
+  m.autoDone = m.autoDone || {};
+  const t = calc(viewMonth);
   const spent = spentByItem(viewMonth);
   const hasLogs = Object.keys(spent).length > 0;
 
@@ -575,11 +624,19 @@ function renderPlan() {
   if (t.rest > 0) segs.push(['残り', t.rest, 'var(--c-rest)']);
   const bar = segs.filter(s => s[1] > 0).map(s => '<div style="width:' + (s[1] / scale * 100) + '%;background:' + s[2] + '" title="' + s[0] + ' ' + yen(s[1]) + '"></div>').join('');
   const incomeMark = t.rest < 0 && t.income > 0 ? '<div class="income-mark" style="left:calc(' + (t.income / scale * 100) + '% - 1px)"><span>収入</span></div>' : '';
+  const status = t.rest < 0 ? '<span class="hero-status neg">⚠ 赤字</span>'
+    : m.leftover === 'savings' ? '<span class="hero-status pos">✓ 貯金で調整</span>'
+    : m.leftover === 'carry' && t.rest > 0 ? '<span class="hero-status pos">➡ 来月へ繰り越し</span>'
+    : '<span class="hero-status pos">✓ 黒字</span>';
 
-  let html = '<div class="card">' +
+  let html = '';
+  const specials = SECTIONS.flatMap(s => m[s.key].filter(isSpecial));
+  if (specials.length && viewMonth >= monthKey(new Date())) {
+    html += '<div class="card banner"><b>先月繰越と貯金の出し入れを自動にできます</b><p class="note" style="margin:4px 0 10px">「' + [...new Set(specials.map(i => i.name))].map(esc).join('」「') + '」を手で入れる代わりに、自動で計算する行に置き換えます。入っている金額は引き継ぎます。</p><button class="btn primary" id="toAuto">自動にする</button></div>';
+  }
+  html += '<div class="card">' +
     '<div class="hero-label">今月の残り（収入 − 固定費 − 積立 − 変動費）</div>' +
-    '<div><span class="hero-value num' + (t.rest < 0 ? ' neg' : '') + '">' + yen(t.rest) + '</span>' +
-    '<span class="hero-status ' + (t.rest < 0 ? 'neg">⚠ 赤字' : 'pos">✓ 黒字') + '</span></div>' +
+    '<div><span class="hero-value num' + (t.rest < 0 ? ' neg' : '') + '">' + yen(t.rest) + '</span>' + status + '</div>' +
     '<div class="seg-bar" role="img" aria-label="収入に対する内訳">' + bar + incomeMark + '</div>' +
     '<div class="seg-scale num"><span>0</span><span>' + (t.rest < 0 ? '支出 ' + yen(out) : '収入 ' + yen(t.income)) + '</span></div>' +
     '<ul class="cascade num">' +
@@ -590,59 +647,173 @@ function renderPlan() {
       '<li class="sub"><span class="op">＝</span><span class="lbl">②（① − 積立）</span><span class="' + (t.b < 0 ? 'neg' : '') + '">' + yen(t.b) + '</span></li>' +
       '<li><span class="op">−</span><i class="swatch" style="background:var(--c-variable)"></i><span class="lbl">変動費</span><span>' + yen(t.variable) + '</span></li>' +
       '<li class="total"><span class="op">＝</span><span class="lbl">残り</span><span class="' + (t.rest < 0 ? 'neg' : '') + '">' + yen(t.rest) + '</span></li>' +
-    '</ul>' +
+    '</ul>' + settleBox(t, m) +
     '<div class="pills num"><span class="pill">💴 手持ちで用意 <b>' + yen(t.cash) + '</b></span>' +
     '<span class="pill">✓ 済み <b>' + t.doneCount + '</b> / ' + t.count + '</span></div>' +
     '</div>';
 
+  const savAcc = accountById(state.savingsAccount);
   for (const s of SECTIONS) {
     const items = m[s.key];
-    const total = sum(items.map(i => i.amount));
-    const done = items.filter(i => i.done).length;
+    const rows = [];
+    if (s.key === 'income') rows.push(autoRow('carry', '先月繰越', t.carryIn, m.carryIn === null ? '自動：' + monthLabel(addMonths(viewMonth, -1)) + 'から繰り越し' : '手で入れた額（タップで変更）', m.carryIn === null ? '自動' : '手入力', !!m.autoDone.carry));
+    for (const it of items) rows.push(itemRow(s, it, spent, hasLogs, items));
+    if (s.key === 'income' && t.fill) rows.push(autoRow('fill', '貯金から補填', t.fill, '自動：足りない分' + (savAcc ? '・' + accountLabel(savAcc) + 'から' : ''), '自動', !!m.autoDone.fill));
+    if (s.key === 'saving' && t.toSav) rows.push(autoRow('toSav', '貯金へ', t.toSav, '自動：余った分' + (savAcc ? '・' + accountLabel(savAcc) + 'へ' : ''), '自動', !!m.autoDone.toSav));
+    const doneN = rows.filter(r => r.done).length;
     html += '<div class="card"><div class="sec-head">' + (s.color ? '<i class="swatch" style="background:' + s.color + '"></i>' : '') +
-      '<h2>' + s.label + '</h2><span class="total num">' + yen(total) + '</span></div>' +
-      '<div class="sec-meta"><span>' + items.length + '項目</span><span>済み ' + done + ' / ' + items.length + '</span></div><ul class="items">';
-    for (const it of items) {
-      const via = viaName(s.key, it.via);
-      const sub = [it.owner && it.owner !== 'ー' ? it.owner : '', via, it.memo].filter(Boolean).join('・');
-      let usage = '';
-      if (s.key === 'variable' && hasLogs) {
-        const u = spent[varKey(it, items)] || 0;
-        const over = u > it.amount;
-        usage = '<div class="usage"><div class="track"><div class="fill' + (over ? ' over' : '') + '" style="width:' + (it.amount ? Math.min(100, u / it.amount * 100) : (u ? 100 : 0)) + '%"></div></div>' +
-          '<div class="u num' + (over ? ' over' : '') + '">使った ' + yen(u) + '　' + (over ? '⚠ ' + yen(u - it.amount) + ' 超過' : '残り ' + yen(it.amount - u)) + '</div></div>';
-      }
-      html += '<li class="item" data-done="' + it.done + '">' +
-        '<button class="check" role="checkbox" aria-checked="' + it.done + '" aria-label="' + esc(it.name) + 'を済みにする" data-sec="' + s.key + '" data-id="' + it.id + '"><i>✓</i></button>' +
-        '<button class="item-main" data-sec="' + s.key + '" data-id="' + it.id + '"><span class="t"><div class="n">' + esc(it.name || '（名前なし）') + '</div>' +
-        (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + usage + '</span>' +
-        '<span class="a num' + (it.amount ? '' : ' zero') + '">' + yen(it.amount) + '</span></button></li>';
-    }
-    html += '<li class="add-row"><button data-add="' + s.key + '">＋ ' + s.label + 'を追加</button></li></ul></div>';
+      '<h2>' + s.label + '</h2><span class="total num">' + yen(t[s.key]) + '</span></div>' +
+      '<div class="sec-meta"><span>' + rows.length + '項目</span><span>済み ' + doneN + ' / ' + rows.length + '</span><span>金額をタップで変更</span></div><ul class="items">' +
+      rows.map(r => r.html).join('') +
+      '<li class="add-row"><button data-add="' + s.key + '">＋ ' + s.label + 'を追加</button></li></ul></div>';
   }
   html += '<div class="card"><label class="field" style="margin:0"><span>今月のメモ</span><textarea id="monthMemo" rows="3" placeholder="例：水道代は次回9月">' + esc(m.memo) + '</textarea></label></div>';
   html += '<div class="btn-col"><button class="btn danger" id="delMonth">' + monthLabel(viewMonth) + 'の計画を削除</button></div>';
   box.innerHTML = html;
 
-  box.querySelectorAll('.check').forEach(b => b.addEventListener('click', () => {
+  box.querySelectorAll('.check[data-id]').forEach(b => b.addEventListener('click', () => {
     const it = m[b.dataset.sec].find(x => x.id === b.dataset.id);
     if (!it) return;
-    it.done = !it.done; save();
-    b.setAttribute('aria-checked', String(it.done));
-    b.closest('.item').dataset.done = String(it.done);
-    const tt = monthTotals(m);
-    box.querySelectorAll('.pill b')[1].textContent = tt.doneCount;
-    const meta = b.closest('.card').querySelector('.sec-meta span:last-child');
-    const list = m[b.dataset.sec];
-    meta.textContent = '済み ' + list.filter(i => i.done).length + ' / ' + list.length;
+    it.done = !it.done; save(); renderPlan();
   }));
-  box.querySelectorAll('.item-main').forEach(b => b.addEventListener('click', () => editItem(b.dataset.sec, b.dataset.id)));
+  box.querySelectorAll('.check[data-auto]').forEach(b => b.addEventListener('click', () => {
+    m.autoDone[b.dataset.auto] = !m.autoDone[b.dataset.auto]; save(); renderPlan();
+  }));
+  box.querySelectorAll('.item-main[data-id]').forEach(b => b.addEventListener('click', () => quickEdit(b.dataset.sec, b.dataset.id)));
+  box.querySelectorAll('.item-main[data-auto-edit]').forEach(b => b.addEventListener('click', () => autoEdit(b.dataset.autoEdit)));
   box.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => editItem(b.dataset.add, null)));
+  box.querySelectorAll('[data-settle]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.settle || null;
+    m.leftover = v; save(); render();
+    toast(v === 'savings' ? '残りが0になるよう、貯金で自動調整します' : v === 'carry' ? '余った分は来月の「先月繰越」に入ります' : '調整をやめました');
+  }));
+  box.querySelectorAll('select[data-savacc]').forEach(sel => sel.addEventListener('change', () => { state.savingsAccount = sel.value; save(); render(); }));
+  if ($('toAuto')) $('toAuto').addEventListener('click', () => {
+    let carry = 0, settle = false;
+    for (const s of SECTIONS) {
+      for (const i of m[s.key].filter(isSpecial)) {
+        if (i.name === '先月繰越') carry += i.amount; else if (i.amount) settle = true;
+      }
+      m[s.key] = m[s.key].filter(i => !isSpecial(i));
+    }
+    m.carryIn = carry ? carry : null;
+    if (settle) m.leftover = 'savings';
+    save(); render(); toast('自動の計算に切り替えました');
+  });
   $('monthMemo').addEventListener('change', e => { m.memo = e.target.value; save(); });
   $('delMonth').addEventListener('click', async () => {
     if (!await confirmDanger(monthLabel(viewMonth) + 'の計画を削除しますか？', '収入・固定費・積立・変動費・口座の移動がすべて消えます。使ったお金の記録は残ります。')) return;
     delete state.months[viewMonth]; save(); render();
   });
+}
+
+function settleBox(t, m) {
+  const savSel = state.accounts.length && !state.savingsAccount
+    ? '<label class="field" style="margin:4px 0 0"><span>貯金用の口座を選ぶと、口座の移動にも自動で入ります</span><select data-savacc><option value="">選ばない</option>' + state.accounts.map(a => '<option value="' + a.id + '">' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '';
+  if (m.leftover === 'savings') {
+    const line = t.fill ? '足りない ' + yen(t.fill) + ' を貯金から補填して、残りを ¥0 にしています'
+      : t.toSav ? '余った ' + yen(t.toSav) + ' を貯金に入れて、残りを ¥0 にしています' : '残りが出たら、貯金で自動調整します';
+    return '<div class="settle on"><div class="settle-row"><span>🏦 ' + line + '</span><button class="btn small" data-settle="">やめる</button></div>' + savSel + '</div>';
+  }
+  if (m.leftover === 'carry' && t.base >= 0) {
+    return '<div class="settle on"><div class="settle-row"><span>➡️ ' + yen(t.carryOut) + ' を来月に繰り越します（来月の「先月繰越」に自動で入ります）</span><button class="btn small" data-settle="">やめる</button></div></div>';
+  }
+  if (t.base < 0) return '<div class="settle warn"><div>⚠ ' + yen(-t.base) + ' 足りません</div><button class="btn primary" data-settle="savings">貯金から補填する</button></div>';
+  if (t.base > 0) return '<div class="settle"><div>' + yen(t.base) + ' 余ります。どうしますか？</div><div class="row"><button class="btn primary" data-settle="savings">貯金に入れる</button><button class="btn" data-settle="carry">来月に繰り越す</button></div></div>';
+  return '';
+}
+
+function autoRow(kind, name, amount, sub, tag, done) {
+  return { done, html: '<li class="item" data-done="' + done + '">' +
+    '<button class="check" role="checkbox" aria-checked="' + done + '" aria-label="' + name + 'を済みにする" data-auto="' + kind + '"><i>✓</i></button>' +
+    '<button class="item-main" data-auto-edit="' + kind + '"><span class="t"><div class="n">' + name + ' <em class="auto-tag">' + tag + '</em></div><div class="s">' + esc(sub) + '</div></span>' +
+    '<span class="a num' + (amount ? '' : ' zero') + '">' + yen(amount) + '</span></button></li>' };
+}
+
+function itemRow(s, it, spent, hasLogs, items) {
+  const via = viaName(s.key, it.via, it.owner);
+  const sub = [it.owner && it.owner !== 'ー' ? it.owner : '', via, it.memo].filter(Boolean).join('・');
+  let usage = '';
+  if (s.key === 'variable' && hasLogs) {
+    const u = spent[varKey(it, items)] || 0;
+    const over = u > it.amount;
+    usage = '<div class="usage"><div class="track"><div class="fill' + (over ? ' over' : '') + '" style="width:' + (it.amount ? Math.min(100, u / it.amount * 100) : (u ? 100 : 0)) + '%"></div></div>' +
+      '<div class="u num' + (over ? ' over' : '') + '">使った ' + yen(u) + '　' + (over ? '⚠ ' + yen(u - it.amount) + ' 超過' : '残り ' + yen(it.amount - u)) + '</div></div>';
+  }
+  return { done: it.done, html: '<li class="item" data-done="' + it.done + '">' +
+    '<button class="check" role="checkbox" aria-checked="' + it.done + '" aria-label="' + esc(it.name) + 'を済みにする" data-sec="' + s.key + '" data-id="' + it.id + '"><i>✓</i></button>' +
+    '<button class="item-main" data-sec="' + s.key + '" data-id="' + it.id + '"><span class="t"><div class="n">' + esc(it.name || '（名前なし）') + '</div>' +
+    (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + usage + '</span>' +
+    '<span class="a num' + (it.amount ? '' : ' zero') + '">' + yen(it.amount) + '</span></button></li>' };
+}
+
+// 金額だけをすばやく変える画面
+function prevAmountOf(secKey, it) {
+  const pm = state.months[addMonths(viewMonth, -1)];
+  if (!pm) return null;
+  const f = pm[secKey].find(x => x.name === it.name && x.owner === it.owner) || pm[secKey].find(x => x.name === it.name);
+  return f ? f.amount : null;
+}
+function quickEdit(secKey, id) {
+  const m = state.months[viewMonth];
+  const it = m[secKey].find(x => x.id === id);
+  if (!it) return;
+  const prev = prevAmountOf(secKey, it);
+  const sub = [it.owner && it.owner !== 'ー' ? it.owner : '', viaName(secKey, it.via, it.owner), it.memo].filter(Boolean).join('・');
+  openSheet(it.name || '（名前なし）',
+    (sub ? '<p class="sheet-sub">' + esc(sub) + '</p>' : '') +
+    '<form id="qForm" autocomplete="off"><div class="big-amount"><input type="text" inputmode="numeric" id="qAmount" value="' + (it.amount ? fmtInput(it.amount) : '') + '" placeholder="0" aria-label="金額"><span class="yen">円</span></div>' +
+    '<div class="chips" style="margin:10px 0 4px">' + (prev !== null && prev !== it.amount ? '<button type="button" class="chip" data-q="' + prev + '">先月と同じ ' + yen(prev) + '</button>' : '') + '<button type="button" class="chip" data-q="0">0円</button></div>' +
+    '<label class="check-row"><input type="checkbox" id="qDone"' + (it.done ? ' checked' : '') + '>済みにする</label>' +
+    '<div class="btn-col"><button class="btn primary">保存する</button><button type="button" class="btn" id="qMore">名前・名義・支払い方法・メモを変える</button></div></form>');
+  const inp = $('qAmount');
+  attachAmountFormatter(inp);
+  inp.focus(); inp.select();
+  $('modal').querySelectorAll('[data-q]').forEach(c => c.addEventListener('click', () => { inp.value = +c.dataset.q ? fmtInput(+c.dataset.q) : ''; inp.focus(); }));
+  $('qMore').addEventListener('click', () => editItem(secKey, id));
+  $('qForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const raw = inp.value.trim();
+    const n = raw === '' ? 0 : parseAmount(raw);
+    if (!Number.isFinite(n)) { toast('金額は数字で入力してください'); return; }
+    it.amount = n; it.done = $('qDone').checked;
+    save(); closeSheet(); render();
+  });
+}
+
+function autoEdit(kind) {
+  const m = state.months[viewMonth];
+  const t = calc(viewMonth);
+  if (kind === 'carry') {
+    const pk = addMonths(viewMonth, -1);
+    openSheet('先月繰越',
+      '<p>' + monthLabel(pk) + 'から繰り越すお金です。' + monthLabel(pk) + 'の計画で「来月に繰り越す」を選ぶと、余った額が自動で入ります（自動の額：' + yen(t.carryAuto) + '）。実際に残ったお金と違うときは、ここで直せます。</p>' +
+      '<form id="cForm" autocomplete="off"><div class="big-amount"><input type="text" inputmode="numeric" id="cAmount" value="' + (t.carryIn ? fmtInput(t.carryIn) : '') + '" placeholder="0" aria-label="先月繰越"><span class="yen">円</span></div>' +
+      '<label class="check-row"><input type="checkbox" id="cDone"' + (m.autoDone.carry ? ' checked' : '') + '>済みにする</label>' +
+      '<div class="btn-col"><button class="btn primary">保存する</button>' + (m.carryIn !== null ? '<button type="button" class="btn" id="cAuto">自動に戻す（' + yen(t.carryAuto) + '）</button>' : '') + '</div></form>');
+    const inp = $('cAmount');
+    attachAmountFormatter(inp, true);
+    inp.focus(); inp.select();
+    if ($('cAuto')) $('cAuto').addEventListener('click', () => { m.carryIn = null; save(); closeSheet(); render(); });
+    $('cForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const raw = inp.value.trim();
+      const n = raw === '' || raw === '-' ? 0 : parseAmount(raw);
+      if (!Number.isFinite(n)) { toast('金額は数字で入力してください'); return; }
+      m.carryIn = n === t.carryAuto ? null : n;
+      m.autoDone.carry = $('cDone').checked;
+      save(); closeSheet(); render();
+    });
+    return;
+  }
+  const fill = kind === 'fill';
+  openSheet(fill ? '貯金から補填' : '貯金へ',
+    '<p>' + (fill ? '足りない分を貯金から出して' : '余った分を貯金に入れて') + '、残りが ¥0 になるよう自動で計算しています（今は ' + yen(fill ? t.fill : t.toSav) + '）。ほかの項目の金額を変えると、この額も自動で変わります。' +
+    (state.savingsAccount ? '' : '\n「設定 → 口座」で貯金用の口座を選ぶと、口座の移動にも自動で入ります。') + '</p>' +
+    '<label class="check-row"><input type="checkbox" id="aDone"' + (m.autoDone[kind] ? ' checked' : '') + '>済みにする</label>' +
+    '<div class="btn-col"><button class="btn primary" id="aOk">閉じる</button><button class="btn" id="aStop">貯金での調整をやめる</button></div>');
+  $('aOk').addEventListener('click', () => { m.autoDone[kind] = $('aDone').checked; save(); closeSheet(); render(); });
+  $('aStop').addEventListener('click', () => { m.leftover = null; save(); closeSheet(); render(); });
 }
 
 function itemNameSuggestions(secKey) {
@@ -711,33 +882,37 @@ function renderAccounts() {
     $('goSet').addEventListener('click', () => showView('settings'));
     return;
   }
-  const infos = state.accounts.map(a => ({ a, ...moveInfo(m, a) }));
+  const infos = state.accounts.map(a => ({ a, ...moveInfo(viewMonth, a) }));
   const prevKey = latestMonthBefore(viewMonth);
-  const prevAfter = a => { if (!prevKey) return null; const pm = state.months[prevKey]; return pm.moves[a.id] ? moveInfo(pm, a).after : null; };
+  const prevAfter = a => { if (!prevKey) return null; const pm = state.months[prevKey]; return pm.moves[a.id] ? moveInfo(prevKey, a).after : null; };
   const inSum = sum(infos.map(i => i.amount > 0 ? i.amount : 0));
   const outSum = sum(infos.map(i => i.amount < 0 ? -i.amount : 0));
-  const t = monthTotals(m);
+  const t = calc(viewMonth);
   const doneN = infos.filter(i => i.mv.done).length;
   let html = '<div class="card"><div class="move-sum num">' +
     '<div class="tile"><div class="label">入金の合計</div><div class="value" style="color:var(--in-text)">' + yen(inSum) + '</div></div>' +
     '<div class="tile"><div class="label">出金の合計</div><div class="value" style="color:var(--out-text)">' + yen(outSum) + '</div></div>' +
     '<div class="tile"><div class="label">手持ちで用意</div><div class="value">' + yen(t.cash) + '</div></div></div>' +
-    '<p class="note">移動済み ' + doneN + ' / ' + infos.length + '口座。移動前の残高を入れると、移動する額が千円単位で自動で出ます（手で変えられます）。</p></div>';
+    '<p class="note">移動済み ' + doneN + ' / ' + infos.length + '口座。移動前の残高を入れると、移動する額が千円単位で自動で出ます。± で入金と出金を切り替えられます。</p></div>';
 
   for (const i of infos) {
     const dir = i.amount > 0 ? '<span class="dir in">↑ 入金</span>' : i.amount < 0 ? '<span class="dir out">↓ 出金</span>' : '';
     const short = i.after !== null && i.after < i.need ? '<div class="mv-warn">⚠ 必要額まで ' + yen(i.need - i.after) + ' 足りません</div>' : '';
-    const debTxt = i.deb.items.length ? '引落 ' + i.deb.items.length + '件 ' + yen(i.deb.total) + '（' + i.deb.items.slice(0, 4).map(x => esc(x.name)).join('・') + (i.deb.items.length > 4 ? '…' : '') + '）' : 'この口座から引き落とされる項目はありません';
+    let debTxt = i.deb.items.length ? '引落 ' + i.deb.items.length + '件 ' + yen(i.deb.total) + '（' + i.deb.items.slice(0, 4).map(x => esc(x.name)).join('・') + (i.deb.items.length > 4 ? '…' : '') + '）' : 'この口座から引き落とされる項目はありません';
+    if (i.a.sweep) debTxt += '<br>余ったお金は出金する口座';
+    if (state.savingsAccount === i.a.id) debTxt += '<br>貯金用の口座' + (t.toSav ? '：貯金へ ' + yen(t.toSav) + ' を入金に含めています' : t.fill ? '：貯金から補填 ' + yen(t.fill) + ' を出金に含めています' : '');
+    const pa = prevAfter(i.a);
     html += '<div class="card" data-acc="' + i.a.id + '"><div class="acct-head"><span class="nm">' + esc(i.a.name) + '</span>' +
       (i.a.owner && i.a.owner !== 'ー' ? '<span class="owner">' + esc(i.a.owner) + '</span>' : '') +
       '<button class="done-btn" data-act="done" aria-pressed="' + i.mv.done + '">' + (i.mv.done ? '✓ 移動済み' : '未') + '</button></div>' +
       '<div class="mv-grid">' +
-        '<label><span>移動前の残高</span><input type="text" inputmode="numeric" data-f="before" value="' + fmtInput(i.mv.before) + '" placeholder="' + (prevAfter(i.a) !== null ? '先月の移動後 ' + nf.format(prevAfter(i.a)) : '入力') + '"></label>' +
+        '<label><span>移動前の残高</span><input type="text" inputmode="numeric" data-f="before" value="' + fmtInput(i.mv.before) + '" placeholder="' + (pa !== null ? '先月の移動後 ' + nf.format(pa) : '入力') + '"></label>' +
         '<label><span>必要額 ' + (i.mv.need === null ? '<em class="auto-tag">自動</em>' : '<button type="button" class="reset-auto" data-reset="need">自動に戻す</button>') + '</span><input type="text" inputmode="numeric" data-f="need" value="' + fmtInput(i.need) + '"></label>' +
-        '<label style="grid-column:1/-1"><span>移動する額（＋入金 / −出金）' + (i.mv.amount === null ? (i.suggestion === null ? '' : '<em class="auto-tag">自動</em>') : '<button type="button" class="reset-auto" data-reset="amount">自動に戻す</button>') + '</span><input type="text" inputmode="numeric" data-f="amount" value="' + (i.amount === null ? '' : fmtInput(i.amount)) + '" placeholder="残高を入れると自動で出ます"></label>' +
+        '<div class="cell" style="grid-column:1/-1"><span>移動する額（＋入金 / −出金）' + (i.mv.amount === null ? (i.suggestion === null ? '' : '<em class="auto-tag">自動</em>') : '<button type="button" class="reset-auto" data-reset="amount">自動に戻す</button>') + '</span>' +
+          '<div class="amt-row"><button type="button" class="sign-btn" data-act="sign" aria-label="入金と出金を切り替える">±</button><input type="text" inputmode="numeric" data-f="amount" value="' + (i.amount === null ? '' : fmtInput(i.amount)) + '" placeholder="残高を入れると自動で出ます" aria-label="移動する額"></div></div>' +
       '</div>' +
       '<div class="mv-result"><span class="lbl">移動後の残高</span><span class="num"><span class="val">' + (i.after === null ? '—' : yen(i.after)) + '</span>' + dir + '</span></div>' + short +
-      '<div class="mv-sub">' + debTxt + (i.a.sweep ? '<br>余ったお金は出金する口座' : '') + '</div></div>';
+      '<div class="mv-sub">' + debTxt + '</div></div>';
   }
   box.innerHTML = html;
 
@@ -753,13 +928,20 @@ function renderAccounts() {
         if (n !== null && !Number.isFinite(n)) { toast('数字で入力してください'); inp.value = ''; return; }
         const mv = get();
         if (f === 'before') mv.before = n;
-        if (f === 'need') { const info = moveInfo(m, accountById(aid)); mv.need = n === null || n === info.autoNeed ? null : n; }
-        if (f === 'amount') { const info = moveInfo(m, accountById(aid)); mv.amount = n === null || n === info.suggestion ? null : n; }
+        if (f === 'need') { const info = moveInfo(viewMonth, accountById(aid)); mv.need = n === null || n === info.autoNeed ? null : n; }
+        if (f === 'amount') { const info = moveInfo(viewMonth, accountById(aid)); mv.amount = n === null || n === info.suggestion ? null : n; }
         save(); renderAccounts();
       });
     });
     card.querySelectorAll('[data-reset]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); get()[b.dataset.reset] = null; save(); renderAccounts(); }));
     card.querySelector('[data-act="done"]').addEventListener('click', () => { const mv = get(); mv.done = !mv.done; save(); renderAccounts(); });
+    card.querySelector('[data-act="sign"]').addEventListener('click', () => {
+      const mv = get();
+      const info = moveInfo(viewMonth, accountById(aid));
+      const n = -(info.amount || 0);
+      mv.amount = n === info.suggestion ? null : n;
+      save(); renderAccounts();
+    });
   });
 }
 
@@ -846,7 +1028,7 @@ function renderTrend() {
   const box = $('view-trend');
   const keys = Object.keys(state.months).sort();
   if (!keys.length) { box.innerHTML = '<div class="card"><p class="empty">計画を作った月がまだありません</p></div>'; return; }
-  const data = keys.slice(-12).map(k => ({ k, ...monthTotals(state.months[k]) }));
+  const data = keys.slice(-12).map(k => ({ k, ...calc(k) }));
   const maxV = Math.max(1, ...data.map(d => Math.max(d.income, d.fixed + d.saving + d.variable)));
   const step = niceStep(maxV / 4);
   const top = Math.ceil(maxV / step) * step;
@@ -928,7 +1110,8 @@ function renderSettings() {
 
     '<div class="card"><h2>口座</h2><ul class="set-list">' + state.accounts.map((a, i) => '<li><span class="grow"><div>' + esc(a.name) + '</div><div class="sub">' + esc(a.owner || '名義なし') + (a.sweep ? '・余りは出金' : '') + '</div></span>' +
       '<button class="btn small" data-up-acc="' + i + '"' + (i ? '' : ' disabled') + ' aria-label="上へ">↑</button><button class="btn small" data-edit-acc="' + i + '">編集</button></li>').join('') + '</ul>' +
-    '<button class="btn" id="addAcc">＋ 口座を追加</button></div>' +
+    '<button class="btn" id="addAcc">＋ 口座を追加</button>' +
+    (state.accounts.length ? '<label class="field" style="margin:14px 0 0"><span>貯金用の口座（「貯金に入れる」「貯金から補填」を、この口座の入金・出金として口座の移動に入れます）</span><select data-savacc><option value="">設定しない</option>' + state.accounts.map(a => '<option value="' + a.id + '"' + (a.id === state.savingsAccount ? ' selected' : '') + '>' + esc(accountLabel(a)) + '</option>').join('') + '</select></label>' : '') + '</div>' +
 
     '<div class="card"><h2>支払い方法</h2><p class="note" style="margin:-4px 0 8px">「引落先の口座」を選ぶと、その口座の必要額に自動で足されます。「現金（手持ち）」にした項目は、手持ちで用意する額に入ります。</p><ul class="set-list">' +
       state.methods.map((me, i) => { const a = accountById(me.accountId); return '<li><span class="grow"><div>' + esc(me.name) + '</div><div class="sub">' + (me.cash ? '現金（手持ち）' : a ? '引落：' + esc(accountLabel(a)) : '引落先なし') + '</div></span><button class="btn small" data-edit-me="' + i + '">編集</button></li>'; }).join('') + '</ul>' +
@@ -961,6 +1144,7 @@ function renderSettings() {
   box.querySelectorAll('[data-up-acc]').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.upAcc; const a = state.accounts; [a[i - 1], a[i]] = [a[i], a[i - 1]]; save(); renderSettings(); }));
   box.querySelectorAll('[data-edit-acc]').forEach(b => b.addEventListener('click', () => editAccount(state.accounts[+b.dataset.editAcc])));
   $('addAcc').addEventListener('click', () => editAccount(null));
+  box.querySelectorAll('select[data-savacc]').forEach(sel => sel.addEventListener('change', () => { state.savingsAccount = sel.value; save(); toast(sel.value ? '貯金用の口座を設定しました' : '貯金用の口座を外しました'); }));
   box.querySelectorAll('[data-edit-me]').forEach(b => b.addEventListener('click', () => editMethod(state.methods[+b.dataset.editMe])));
   $('addMe').addEventListener('click', () => editMethod(null));
   $('expJson').addEventListener('click', () => download('kakeibo_backup_' + dateKey(new Date()) + '.json', JSON.stringify({ app: 'kakeibo', exportedAt: new Date().toISOString(), data: state }, null, 1), 'application/json'));
@@ -988,6 +1172,7 @@ function editAccount(a) {
   if (a) $('aDel').addEventListener('click', async () => {
     if (!await confirmDanger('口座「' + a.name + '」を削除しますか？', 'この口座の移動の記録と、支払い方法・収入との結びつきが外れます。')) return;
     state.accounts = state.accounts.filter(x => x.id !== a.id);
+    if (state.savingsAccount === a.id) state.savingsAccount = '';
     state.methods.forEach(me => { if (me.accountId === a.id) me.accountId = ''; });
     for (const m of Object.values(state.months)) { delete m.moves[a.id]; m.income.forEach(i => { if (i.via === a.id) i.via = ''; }); }
     save(); render();
@@ -1046,7 +1231,11 @@ function planToCSV() {
   const lines = [csvLine(PLAN_HEAD)];
   for (const k of Object.keys(state.months).sort()) {
     const m = state.months[k];
+    const c = calc(k), ad = m.autoDone || {};
+    if (c.carryIn) lines.push(csvLine([k, '収入', '先月繰越', '', '', c.carryIn, ad.carry ? '済' : '', '自動計算']));
     for (const s of SECTIONS) for (const i of m[s.key]) lines.push(csvLine([k, s.label, i.name, i.owner, viaName(s.key, i.via), i.amount, i.done ? '済' : '', i.memo]));
+    if (c.fill) lines.push(csvLine([k, '収入', '貯金から補填', '', '', c.fill, ad.fill ? '済' : '', '自動計算']));
+    if (c.toSav) lines.push(csvLine([k, '積立', '貯金へ', '', '', c.toSav, ad.toSav ? '済' : '', '自動計算']));
   }
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
@@ -1152,7 +1341,7 @@ async function importPlanCSV(rows, col) {
   const findAcc = name => state.accounts.find(a => accountLabel(a) === name || a.name === name);
   const findMe = name => state.methods.find(m => m.name === name);
   for (const mk of months) {
-    const m = state.months[mk] || { income: [], fixed: [], saving: [], variable: [], moves: {}, memo: '' };
+    const m = state.months[mk] || { income: [], fixed: [], saving: [], variable: [], moves: {}, memo: '', leftover: null, carryIn: null, autoDone: {} };
     for (const s of SECTIONS) m[s.key] = [];
     for (const r of byMonth[mk]) {
       let via = '';
@@ -1216,6 +1405,12 @@ function toast(msg) {
    起動
    ========================================================= */
 applyTheme(getTheme());
+(() => {
+  // 今月の計画がまだなければ、いちばん新しい月をコピーして自動で作る
+  const cur = monthKey(new Date());
+  const prev = latestMonthBefore(cur);
+  if (!state.months[cur] && prev) { createMonth(cur, prev); setTimeout(() => toast(monthLabel(cur) + 'の計画を' + monthLabel(prev) + 'からコピーして作りました'), 300); }
+})();
 render();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* プレビュー環境などでは登録しない */ });
