@@ -96,6 +96,9 @@ main { max-width: 560px; margin: 0 auto; padding: 12px 16px 24px; }
 .row-btn .go { color: var(--muted); font-size: 20px; }
 .acc[data-done="true"] .a { color: var(--muted); text-decoration: line-through; }
 .item-btn { width: 100%; }
+.once { font-size: 11px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 7px; margin-left: 6px; vertical-align: 2px; white-space: nowrap; }
+.check-row { display: flex; align-items: center; gap: 10px; min-height: 48px; font-size: 15px; margin-bottom: 10px; }
+.check-row input { width: 22px; height: 22px; accent-color: var(--check); margin: 0; }
 .item-btn .n { font-weight: 400; }
 .add { width: 100%; background: none; border: 0; border-top: 1px solid var(--grid); color: var(--accent); font-weight: 600; padding: 12px 0; text-align: left; font-size: 15px; min-height: 48px; }
 .list + .add { border-top: 1px solid var(--grid); }
@@ -181,7 +184,7 @@ const THEME_KEY = 'kakeibo.theme';
 const KIND = { bank: { label: '銀行口座', icon: '🏦' }, cash: { label: '現金（手持ち）', icon: '💴' } };
 
 function defaultState() {
-  return { version: 4, accounts: [{ id: 'a_cash', name: '手持ち', kind: 'cash' }], months: {} };
+  return { version: 4, accounts: [{ id: 'a_cash', name: '手持ち', kind: 'cash' }], months: {}, roundUnit: 1000 };
 }
 let state = loadState();
 let storageOk = true;
@@ -208,10 +211,10 @@ function normalizeState(s) {
     const months = {};
     for (const [mk, m] of Object.entries(s.months || {})) {
       if (!/^\d{4}-\d{2}$/.test(mk) || !m) continue;
-      const clean = arr => (Array.isArray(arr) ? arr : []).filter(i => i && i.name !== undefined).map(i => ({ id: String(i.id || uid()), name: String(i.name), acc: String(i.acc || ''), amount: int(i.amount), memo: String(i.memo || '') }));
+      const clean = arr => (Array.isArray(arr) ? arr : []).filter(i => i && i.name !== undefined).map(i => ({ id: String(i.id || uid()), name: String(i.name), acc: String(i.acc || ''), amount: int(i.amount), memo: String(i.memo || ''), fixed: i.fixed !== false }));
       months[mk] = { income: clean(m.income), out: clean(m.out), done: Object.fromEntries(Object.entries(m.done || {}).filter(([, v]) => v).map(([k]) => [k, true])) };
     }
-    return { version: 4, accounts, months };
+    return { version: 4, accounts, months, roundUnit: [0, 100, 1000, 10000].includes(s.roundUnit) ? s.roundUnit : 1000 };
   }
   return fromOldVersion(s);
 }
@@ -248,13 +251,13 @@ function fromOldVersion(s) {
       return owner && list.filter(x => x.name === i.name).length > 1 && !i.name.startsWith(owner) ? owner + i.name : String(i.name);
     };
     const inc = Array.isArray(m.income) ? m.income : [];
-    for (const i of inc) nm.income.push({ id: String(i.id || uid()), name: label(i, inc), acc: String(i.via || ''), amount: int(i.amount), memo: String(i.memo || '') });
+    for (const i of inc) nm.income.push({ id: String(i.id || uid()), name: label(i, inc), acc: String(i.via || ''), amount: int(i.amount), memo: String(i.memo || ''), fixed: true });
     const outs = ['fixed', 'variable', 'saving'].flatMap(k => Array.isArray(m[k]) ? m[k] : []);
     const byCard = {};
     for (const i of outs) {
       let acc = String(via[i.via] !== undefined ? via[i.via] : (i.via || ''));
       if (cards[acc]) { (byCard[acc] = byCard[acc] || []).push(i); continue; }
-      nm.out.push({ id: String(i.id || uid()), name: label(i, outs), acc, amount: int(i.amount), memo: String(i.memo || '') });
+      nm.out.push({ id: String(i.id || uid()), name: label(i, outs), acc, amount: int(i.amount), memo: String(i.memo || ''), fixed: true });
     }
     // カードは「引き落とし口座から払う1行（請求額）」にまとめる
     for (const [cid, items] of Object.entries(byCard)) {
@@ -263,8 +266,8 @@ function fromOldVersion(s) {
       const bd = items.filter(i => !i.bill);
       if (bill) {
         const inside = bd.length ? bd.map(i => i.name + ' ' + int(i.amount).toLocaleString('ja-JP')).join('・') + ' を含む' : '';
-        nm.out.push({ id: String(bill.id || uid()), name: String(card.name), acc: String(card.payFrom || ''), amount: int(bill.amount), memo: [inside, bill.memo].filter(Boolean).join('／') });
-      } else for (const i of bd) nm.out.push({ id: String(i.id || uid()), name: String(i.name), acc: String(card.payFrom || ''), amount: int(i.amount), memo: [card.name + '払い', i.memo].filter(Boolean).join('・') });
+        nm.out.push({ id: String(bill.id || uid()), name: String(card.name), acc: String(card.payFrom || ''), amount: int(bill.amount), memo: [inside, bill.memo].filter(Boolean).join('／'), fixed: true });
+      } else for (const i of bd) nm.out.push({ id: String(i.id || uid()), name: String(i.name), acc: String(card.payFrom || ''), amount: int(i.amount), memo: [card.name + '払い', i.memo].filter(Boolean).join('・'), fixed: true });
     }
     for (const [aid, mv] of Object.entries(m.moves || {})) if (mv && mv.done) nm.done[aid] = true;
     out.months[mk] = nm;
@@ -293,19 +296,22 @@ const accountById = id => state.accounts.find(a => a.id === id);
 /* =========================================================
    計算：入ってくる − 分ける ＝ のこり
    ========================================================= */
+// 口座に入れる額は、設定した単位（初期は1,000円）で繰り上げる
+function roundUp(v) { const u = state.roundUnit || 0; return u && v > 0 ? Math.ceil(v / u) * u : v; }
 function totals(m) {
   const inc = sum(m.income.map(i => i.amount));
-  const out = sum(m.out.map(i => i.amount));
+  const out = sum(rowsOf(m).map(r => r.send));
   return { inc, out, rest: inc - out };
 }
 function rowsOf(m) {
   const rows = state.accounts.map(a => {
     const items = m.out.filter(i => i.acc === a.id);
     const keep = m.income.some(i => i.acc === a.id);
-    return { a, items, total: sum(items.map(i => i.amount)), verb: a.kind === 'cash' ? '現金でおろす' : keep ? 'に残しておく' : 'に入れる' };
+    const total = sum(items.map(i => i.amount));
+    return { a, items, total, send: roundUp(total), verb: a.kind === 'cash' ? '現金でおろす' : keep ? 'に残しておく' : 'に入れる' };
   }).filter(r => r.items.length);
   const lost = m.out.filter(i => !accountById(i.acc));
-  if (lost.length) rows.push({ a: { id: '', name: '口座が決まっていない', kind: 'none' }, items: lost, total: sum(lost.map(i => i.amount)), verb: '' });
+  if (lost.length) { const total = sum(lost.map(i => i.amount)); rows.push({ a: { id: '', name: '口座が決まっていない', kind: 'none' }, items: lost, total, send: total, verb: '' }); }
   return rows;
 }
 
@@ -313,9 +319,10 @@ function rowsOf(m) {
    月：なければ前の月をコピーして作る
    ========================================================= */
 function latestMonthBefore(mk) { const k = Object.keys(state.months).filter(x => x < mk).sort(); return k.length ? k[k.length - 1] : null; }
+// 「毎月入れる」ものだけを、前の月の金額でコピーする（「今月だけ」のものはコピーしない）
 function copyMonth(mk, from) {
   const src = state.months[from];
-  const cp = arr => arr.map(i => ({ ...i, id: uid() }));
+  const cp = arr => arr.filter(i => i.fixed !== false).map(i => ({ ...i, id: uid() }));
   state.months[mk] = src ? { income: cp(src.income), out: cp(src.out), done: {} } : { income: [], out: [], done: {} };
   save();
 }
@@ -349,7 +356,7 @@ function renderPlan() {
   if (!m) {
     const prev = latestMonthBefore(viewMonth);
     box.innerHTML = '<div class="card"><h2>' + monthLabel(viewMonth) + 'はまだありません</h2><div class="btn-col" style="margin:8px 0">' +
-      (prev ? '<button class="btn primary" id="mkCopy">' + monthLabel(prev) + 'と同じ内容で作る</button>' : '') +
+      (prev ? '<button class="btn primary" id="mkCopy">' + monthLabel(prev) + 'の「毎月入れる」もので作る</button>' : '') +
       '<button class="btn' + (prev ? '' : ' primary') + '" id="mkEmpty">空で作る</button></div></div>';
     if (prev) $('mkCopy').addEventListener('click', () => { copyMonth(viewMonth, prev); render(); });
     $('mkEmpty').addEventListener('click', () => { copyMonth(viewMonth, null); render(); });
@@ -371,9 +378,9 @@ function renderPlan() {
         (r.a.id ? '<button class="check" role="checkbox" aria-checked="' + done + '" aria-label="' + esc(r.a.name) + 'に分けた" data-done-acc="' + r.a.id + '"><i>✓</i></button>' : '<span class="check"></span>') +
         '<button class="row-btn" data-acc="' + r.a.id + '"><span class="t"><div class="n">' + icon + esc(r.a.name) + '<span class="verb">' + r.verb + '</span></div>' +
         '<div class="s">' + esc(r.items.map(i => i.name).join('・')) + '</div></span>' +
-        '<span class="a num' + (r.total ? '' : ' zero') + '">' + yen(r.total) + '</span><span class="go">›</span></button></li>';
+        '<span class="a num' + (r.send ? '' : ' zero') + '">' + yen(r.send) + '</span><span class="go">›</span></button></li>';
     }).join('') + '</ul><button class="add" id="addOut">＋ 払うものを追加</button></div>' +
-    (latestMonthBefore(viewMonth) ? '<button class="btn" id="copyPrev">📋 ' + monthLabel(latestMonthBefore(viewMonth)) + 'の内容をコピーする</button>' : '');
+    (latestMonthBefore(viewMonth) ? '<button class="btn" id="copyPrev">📋 ' + monthLabel(latestMonthBefore(viewMonth)) + 'の「毎月入れる」ものを入れ直す</button>' : '');
 
   $('openIncome').addEventListener('click', () => incomeSheet());
   box.querySelectorAll('[data-done-acc]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.doneAcc; if (m.done[id]) delete m.done[id]; else m.done[id] = true; save(); renderPlan(); }));
@@ -381,10 +388,10 @@ function renderPlan() {
   $('addOut').addEventListener('click', () => editItem('out', null, '', () => closeSheet()));
   if ($('copyPrev')) $('copyPrev').addEventListener('click', async () => {
     const prev = latestMonthBefore(viewMonth);
-    const ok = await ask(monthLabel(prev) + 'の内容をコピーしますか？', monthLabel(viewMonth) + 'の入ってくるお金・払うもの・金額が、' + monthLabel(prev) + 'と同じになります。今の' + monthLabel(viewMonth) + 'の内容は置き換わり、✓ は外れます。',
+    const ok = await ask(monthLabel(prev) + 'の「毎月入れる」ものを入れ直しますか？', monthLabel(viewMonth) + 'の内容が、' + monthLabel(prev) + 'の「毎月入れる」ものと同じ金額になります。「今月だけ」のものは消え、✓ は外れます。',
       [{ label: 'コピーする', value: true, cls: 'primary' }, { label: 'やめる', value: false }]);
     if (ok !== true) return;
-    copyMonth(viewMonth, prev); render(); toast(monthLabel(prev) + 'の内容をコピーしました');
+    copyMonth(viewMonth, prev); render(); toast(monthLabel(prev) + 'から入れ直しました');
   });
 }
 
@@ -405,7 +412,7 @@ function accountSheet(accId) {
   const r = rowsOf(m).find(x => x.a.id === accId);
   if (!r) { closeSheet(); render(); return; }
   const done = !!m.done[accId];
-  openSheet(r.a.name + ' ' + r.verb, yen(r.total) + (accId ? '' : '\nタップして口座を選んでください'),
+  openSheet(r.a.name + ' ' + r.verb + ' ' + yen(r.send), (r.send !== r.total ? '払うものの合計 ' + yen(r.total) + ' を ' + nf.format(state.roundUnit) + '円単位で繰り上げ' : '') + (accId ? '' : 'タップして口座を選んでください'),
     '<ul class="list">' + r.items.map(i => itemRow(i, i.memo)).join('') + '</ul>' +
     (accId ? '<button class="add" id="sAdd">＋ ' + esc(r.a.name) + 'から払うものを追加</button>' : '') +
     '<div class="btn-col" style="margin-top:8px">' + (accId ? '<button class="btn' + (done ? ' done-on' : '') + '" id="sDone">' + (done ? '✓ 分けた' : 'まだ分けていない（タップで ✓）') + '</button>' : '') +
@@ -418,7 +425,7 @@ function accountSheet(accId) {
   $('sClose').addEventListener('click', () => { closeSheet(); render(); });
 }
 function itemRow(i, sub) {
-  return '<li><button class="row-btn item-btn" data-item="' + i.id + '"><span class="t"><div class="n">' + esc(i.name || '（名前なし）') + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</span>' +
+  return '<li><button class="row-btn item-btn" data-item="' + i.id + '"><span class="t"><div class="n">' + esc(i.name || '（名前なし）') + (i.fixed === false ? '<span class="once">今月だけ</span>' : '') + '</div>' + (sub ? '<div class="s">' + esc(sub) + '</div>' : '') + '</span>' +
     '<span class="a num' + (i.amount ? '' : ' zero') + '">' + yen(i.amount) + '</span></button></li>';
 }
 function bindItems(kind, back) {
@@ -464,6 +471,7 @@ function editItem(kind, id, presetAcc, back) {
     '<label class="field"><span>金額</span><div class="big-amount"><input type="text" inputmode="numeric" id="iAmount" value="' + fmtInput(v.amount) + '" placeholder="0"><span class="yen">円</span></div></label>' +
     '<label class="field"><span>' + (kind === 'income' ? '入る口座' : 'どの口座から払う？') + '</span><select id="iAcc"><option value="">決めない</option>' + state.accounts.map(a => '<option value="' + a.id + '"' + (a.id === v.acc ? ' selected' : '') + '>' + KIND[a.kind].icon + ' ' + esc(a.name) + '</option>').join('') + '</select></label>' +
     '<label class="field"><span>メモ</span><input type="text" id="iMemo" maxlength="100" value="' + esc(v.memo) + '"></label>' +
+    '<label class="check-row"><input type="checkbox" id="iFixed"' + (v.fixed === false ? '' : ' checked') + '>毎月入れる（来月も自動で入る）</label>' +
     '<div class="btn-col"><button class="btn primary">保存する</button>' + (it ? '<button type="button" class="btn danger" id="iDel">消す</button>' : '') + '<button type="button" class="btn" id="iBack">戻る</button></div></form>');
   amountInput($('iAmount'));
   if (!it) $('iName').focus();
@@ -475,7 +483,7 @@ function editItem(kind, id, presetAcc, back) {
     const n = $('iAmount').value.trim() === '' ? 0 : parseAmount($('iAmount').value);
     if (!name) { toast('なまえを入れてください'); return; }
     if (!Number.isFinite(n)) { toast('金額は数字で入れてください'); return; }
-    const rec = { name, amount: n, acc: $('iAcc').value, memo: $('iMemo').value.trim() };
+    const rec = { name, amount: n, acc: $('iAcc').value, memo: $('iMemo').value.trim(), fixed: $('iFixed').checked };
     if (it) Object.assign(it, rec); else m[kind].push({ id: uid(), ...rec });
     save(); render();
     // 口座を変えたら、その口座の画面に戻る
@@ -500,6 +508,7 @@ function renderSettings() {
       '<button class="btn" id="impCsv">表計算から読み込む（CSV）</button>' +
       '<button class="btn danger" id="delMonth">' + monthLabel(viewMonth) + 'を消す</button>' +
       '<button class="btn danger" id="wipe">ぜんぶ消す</button></div></div>' +
+    '<div class="card"><h2>口座に入れる額</h2><label class="field"><span>繰り上げ</span><select id="roundSel">' + [[1000, '1,000円単位で繰り上げる'], [10000, '1万円単位で繰り上げる'], [100, '100円単位で繰り上げる'], [0, '繰り上げない']].map(([v, l]) => '<option value="' + v + '"' + ((state.roundUnit || 0) === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label></div>' +
     '<div class="card"><h2>表示</h2><label class="field"><span>色</span><select id="themeSel"><option value="auto">スマホの設定に合わせる</option><option value="light">明るい</option><option value="dark">暗い</option></select></label></div>';
   box.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.up, a = state.accounts; [a[i - 1], a[i]] = [a[i], a[i - 1]]; save(); renderSettings(); }));
   box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editAccount(state.accounts[+b.dataset.edit])));
@@ -510,6 +519,7 @@ function renderSettings() {
   $('impCsv').addEventListener('click', () => $('fileCsv').click());
   $('delMonth').addEventListener('click', async () => { if (!state.months[viewMonth]) { toast('この月はありません'); return; } if (await confirmDanger(monthLabel(viewMonth) + 'を消しますか？', 'この月の内容がすべて消えます。')) { delete state.months[viewMonth]; save(); toast('消しました'); render(); } });
   $('wipe').addEventListener('click', async () => { if (await confirmDanger('ぜんぶ消しますか？', '口座も月の内容もすべて消えます。元に戻せません。')) { state = defaultState(); save(); toast('消しました'); render(); } });
+  $('roundSel').addEventListener('change', e => { state.roundUnit = +e.target.value; save(); toast('変えました'); });
   $('themeSel').value = getTheme();
   $('themeSel').addEventListener('change', e => { try { localStorage.setItem(THEME_KEY, e.target.value); } catch (err) { /* ignore */ } applyTheme(e.target.value); });
 }
@@ -654,7 +664,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 applyTheme(getTheme());
 (() => {
   const cur = monthKey(new Date()), prev = latestMonthBefore(cur);
-  if (!state.months[cur] && prev) { copyMonth(cur, prev); setTimeout(() => toast(monthLabel(cur) + 'を' + monthLabel(prev) + 'と同じ内容で作りました'), 300); }
+  if (!state.months[cur] && prev) { copyMonth(cur, prev); setTimeout(() => toast(monthLabel(cur) + 'を「毎月入れる」もので作りました'), 300); }
 })();
 save();
 render();
