@@ -372,12 +372,20 @@ function renderPlan() {
         '<button class="row-btn" data-acc="' + r.a.id + '"><span class="t"><div class="n">' + icon + esc(r.a.name) + '<span class="verb">' + r.verb + '</span></div>' +
         '<div class="s">' + esc(r.items.map(i => i.name).join('・')) + '</div></span>' +
         '<span class="a num' + (r.total ? '' : ' zero') + '">' + yen(r.total) + '</span><span class="go">›</span></button></li>';
-    }).join('') + '</ul><button class="add" id="addOut">＋ 払うものを追加</button></div>';
+    }).join('') + '</ul><button class="add" id="addOut">＋ 払うものを追加</button></div>' +
+    (latestMonthBefore(viewMonth) ? '<button class="btn" id="copyPrev">📋 ' + monthLabel(latestMonthBefore(viewMonth)) + 'の内容をコピーする</button>' : '');
 
   $('openIncome').addEventListener('click', () => incomeSheet());
   box.querySelectorAll('[data-done-acc]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.doneAcc; if (m.done[id]) delete m.done[id]; else m.done[id] = true; save(); renderPlan(); }));
   box.querySelectorAll('.row-btn').forEach(b => b.addEventListener('click', () => accountSheet(b.dataset.acc)));
   $('addOut').addEventListener('click', () => editItem('out', null, '', () => closeSheet()));
+  if ($('copyPrev')) $('copyPrev').addEventListener('click', async () => {
+    const prev = latestMonthBefore(viewMonth);
+    const ok = await ask(monthLabel(prev) + 'の内容をコピーしますか？', monthLabel(viewMonth) + 'の入ってくるお金・払うもの・金額が、' + monthLabel(prev) + 'と同じになります。今の' + monthLabel(viewMonth) + 'の内容は置き換わり、✓ は外れます。',
+      [{ label: 'コピーする', value: true, cls: 'primary' }, { label: 'やめる', value: false }]);
+    if (ok !== true) return;
+    copyMonth(viewMonth, prev); render(); toast(monthLabel(prev) + 'の内容をコピーしました');
+  });
 }
 
 // 入ってくるお金の中身
