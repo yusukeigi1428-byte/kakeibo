@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリ本体をキャッシュする。
 // index.html などを更新したら CACHE の番号を上げること。
-const CACHE = 'kakeibo-v6';
+const CACHE = 'kakeibo-v7';
 const ASSETS = [
   './',
   './index.html',
