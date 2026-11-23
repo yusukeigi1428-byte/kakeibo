@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>家計簿</title>
 <meta name="description" content="入ってくるお金を、どの口座にいくら分けるかを決める家計簿">
-<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eef1f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#06070c" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -246,6 +246,62 @@ html, body { overflow-x: hidden; }
   display: flex; align-items: center; gap: 14px; opacity: 0; transition: opacity .2s, transform .25s; pointer-events: none; max-width: calc(100% - 32px); box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast button { border: 0; background: none; color: #64d2ff; font-weight: 700; font-size: 15px; padding: 0; white-space: nowrap; }
+
+/* ===== グラスモーフィズム：色のついた背景の上に、すりガラスのパネルを重ねる ===== */
+:root {
+  --page: #eef1f8;
+  --blob1: rgba(10,132,255,.48); --blob2: rgba(175,82,222,.40); --blob3: rgba(255,55,95,.30); --blob4: rgba(48,209,88,.30);
+  --glass: rgba(255,255,255,.55); --glass-strong: rgba(255,255,255,.86); --glass-solid: rgba(255,255,255,.94);
+  --glass-line: rgba(255,255,255,.75); --glass-shadow: 0 10px 30px rgba(40,50,110,.12), inset 0 1px 0 rgba(255,255,255,.6);
+  --label2: rgba(40,40,50,.66);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #06070c;
+    --blob1: rgba(10,132,255,.42); --blob2: rgba(175,82,222,.36); --blob3: rgba(255,55,95,.26); --blob4: rgba(48,209,88,.20);
+    --glass: rgba(40,40,48,.45); --glass-strong: rgba(30,30,36,.84); --glass-solid: rgba(44,44,50,.96);
+    --glass-line: rgba(255,255,255,.14); --glass-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+    --label2: rgba(235,235,245,.68);
+  }
+}
+:root[data-theme="dark"] {
+  --page: #06070c;
+  --blob1: rgba(10,132,255,.42); --blob2: rgba(175,82,222,.36); --blob3: rgba(255,55,95,.26); --blob4: rgba(48,209,88,.20);
+  --glass: rgba(40,40,48,.45); --glass-strong: rgba(30,30,36,.84); --glass-solid: rgba(44,44,50,.96);
+  --glass-line: rgba(255,255,255,.14); --glass-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+  --label2: rgba(235,235,245,.68);
+}
+body { background: var(--page); }
+body::before { content: ''; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 15% 12%, var(--blob1), transparent 70%),
+    radial-gradient(38% 32% at 88% 22%, var(--blob2), transparent 70%),
+    radial-gradient(45% 35% at 75% 88%, var(--blob3), transparent 70%),
+    radial-gradient(40% 35% at 8% 78%, var(--blob4), transparent 70%); }
+.glass, .group, .hero, .sheet, .as-group, .toast, .chip {
+  -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%);
+}
+.group { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 18px; box-shadow: var(--glass-shadow); }
+.hero { margin: 4px 16px 24px; padding: 18px 16px 20px; background: var(--glass); border: 1px solid var(--glass-line); border-radius: 24px; box-shadow: var(--glass-shadow); }
+.hero.small { margin-top: 0; }
+.sheet { background: var(--glass-strong); border: 1px solid var(--glass-line); border-bottom: 0; border-radius: 20px 20px 0 0; }
+.sheet .group { background: var(--glass); }
+.group .swipe-content, .sheet .group .swipe-content { background: transparent; }
+.swipe.moving .swipe-content, .swipe.open .swipe-content { background: var(--glass-solid); }
+.cell::before { background: var(--glass-line); transform: none; height: 1px; opacity: .9; }
+:root[data-theme="dark"] .cell::before { background: rgba(255,255,255,.1); }
+.tile { background-image: linear-gradient(160deg, rgba(255,255,255,.35), rgba(255,255,255,0) 55%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.12); }
+.pill { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.chip { background: var(--glass); border: 1px solid var(--glass-line); }
+.big-btn { background: linear-gradient(135deg, #0a84ff, #5e5ce6); box-shadow: 0 8px 20px rgba(10,132,255,.35), inset 0 1px 0 rgba(255,255,255,.35); }
+.big-btn.done { background: var(--glass); color: var(--green); box-shadow: var(--glass-shadow); border: 1px solid var(--glass-line); }
+.as-group { background: var(--glass-strong); border: 1px solid var(--glass-line); }
+.as-group:last-child { background: var(--glass-solid); }
+.toast { background: rgba(20,20,28,.72); border: 1px solid rgba(255,255,255,.14); }
+.nav.scrolled, .tabbar { background: var(--glass); border-color: var(--glass-line); }
+.tabbar { box-shadow: 0 -1px 0 var(--glass-line); }
+.sheet-back { background: rgba(10,10,30,.25); }
+.cell.link:active, .acc-open:active { background: rgba(255,255,255,.25); }
 </style>
 </head>
 <body>
