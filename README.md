@@ -120,7 +120,7 @@ iPhone では、ホーム画面に追加したアプリと Safari でデータ�
 | `sw.js` | オフラインで開けるようにするキャッシュ |
 | `icons/` | アプリのアイコン（Google の Material Symbols「account_balance_wallet」から作成） |
 
-`index.html` を更新したら、`sw.js` の `CACHE` の番号を上げてください（今は `kakeibo-v29`）。
+`index.html` を更新したら、`sw.js` の `CACHE` の番号を上げてください（今は `kakeibo-v30`）。
 
 ## アイコンについて
 
