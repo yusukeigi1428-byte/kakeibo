@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリ本体をキャッシュする。
 // index.html などを更新したら CACHE の番号を上げること。
-const CACHE = 'kakeibo-v36';
+const CACHE = 'kakeibo-v37';
 // Google Fonts は版を上げても消さずに使い回す
 const FONT_CACHE = 'kakeibo-fonts';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -31,8 +31,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   // フォント：キャッシュがあればそれを使い、なければ取りに行って保存する
-  // 銀行・カードのロゴ（Google のサイトアイコン）も同じように保存して使い回す
-  if (FONT_HOSTS.includes(url.hostname) || (url.hostname === 'www.google.com' && url.pathname.startsWith('/s2/favicons'))) {
+  if (FONT_HOSTS.includes(url.hostname)) {
     e.respondWith(caches.open(FONT_CACHE).then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(res => {
       if (res.ok || res.type === 'opaque') c.put(e.request, res.clone());
       return res;
