@@ -396,6 +396,38 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 #view-graph { position: relative; }
 .cv-tip { position: absolute; z-index: 5; pointer-events: none; opacity: 0; transition: opacity .12s; background: var(--label); color: var(--bg); font-size: 13px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
 .cv-tip.show { opacity: 1; }
+
+/* ===== 黒字・赤字 ===== */
+.hero.bal .big { font-size: 44px; }
+.bal-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 999px; font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.bal-tag .ms { width: 18px; height: 18px; fill: currentColor; }
+.bal-tag.black { color: var(--cv-good); background: color-mix(in srgb, var(--cv-good) 14%, transparent); }
+.bal-tag.red { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); }
+.hero .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.hero .stats > div { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 14px; background: var(--fill); }
+.hero .stats span { font-size: 12px; color: var(--label2); }
+.hero .stats b { font-size: 20px; font-weight: 600; }
+.hero .stats b.ok { color: var(--cv-good); }
+.hero .stats b.ng { color: var(--red); }
+.pend-line.center-text { text-align: center; margin: -14px 0 18px; }
+/* ===== 収入に対する割合 ===== */
+:root { --cv-good: #0a7f0a; --cv-bad: #d03b3b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --cv-good: #0ca30c; --cv-bad: #e66767; } }
+:root[data-theme="dark"] { --cv-good: #0ca30c; --cv-bad: #e66767; }
+.rt + .rt { margin-top: 18px; }
+.rt-head { display: flex; align-items: baseline; justify-content: space-between; }
+.rt-l { font-size: 16px; font-weight: 500; }
+.rt-v { font-size: 22px; font-weight: 600; }
+.rt-v.ng { color: var(--red); }
+.rt-bar { position: relative; height: 14px; margin-top: 6px; border-radius: 7px; background: var(--fill); overflow: visible; }
+.rt-fill { height: 100%; border-radius: 7px; }
+.rt-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--label); border-radius: 1px; }
+.rt-guide { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 13px; font-weight: 500; }
+.rt-guide .ms { width: 16px; height: 16px; fill: currentColor; }
+.rt-guide.ok { color: var(--cv-good); }
+.rt-guide.ng { color: var(--red); }
+.cv-v2 { font-size: 12px; }
+.cv-ax { font-size: 12px; }
 </style>
 </head>
 <body>
@@ -444,7 +476,7 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
    - 項目: { id, name, acc, amount, memo }
    ========================================================= */
 const STORAGE_KEY = 'kakeibo.v2';
-const APP_VERSION = '2026.11.24-10';
+const APP_VERSION = '2026.11.24-11';
 const THEME_KEY = 'kakeibo.theme';
 // アイコンは Google の Material Symbols（Rounded・Apache License 2.0）
 const ICONS = {"account_balance-fill": "M212-271v-279q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v279q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37Zm242 0v-279q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v279q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37ZM110-121q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q97.25-181 110-181h740q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H110Zm578-150v-279q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v279q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37Zm166-369H103q-9.58 0-16.29-6.71Q80-653.42 80-663v-17q0-6 3.5-11.5T92-700l358-204q14.17-8 30-8t30 8l357 203q6 4 9.5 10t3.5 13.5v10.23q0 11.59-7.47 19.43Q865.05-640 854-640Z", "payments-fill": "M100-160q-24.75 0-42.37-17.63Q40-195.25 40-220v-430q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v430h670q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H100Zm120-120q-24.75 0-42.37-17.63Q160-315.25 160-340v-400q0-24.75 17.63-42.38Q195.25-800 220-800h640q24.75 0 42.38 17.62Q920-764.75 920-740v400q0 24.75-17.62 42.37Q884.75-280 860-280H220Zm100-60q0-42-29-71t-71-29v100h100Zm440 0h100v-100q-42 0-71 29t-29 71Zm-220-80q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM220-640q42 0 71-29t29-71H220v100Zm640 0v-100H760q0 42 29 71t71 29Z", "help-fill": "M484.03-247Q500-247 511-258.03q11-11.03 11-27T510.97-312q-11.03-11-27-11T457-311.97q-11 11.03-11 27T457.03-258q11.03 11 27 11Zm-3.76 167q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Zm2.5-580Q513-660 536-641.5q23 18.5 23 47.2 0 26.3-15.65 45.73Q527.7-529.14 508-512q-23 19-40 42.38-17 23.39-17 52.62 0 11 8.4 17.5T479-393q12 0 19.88-8 7.87-8 10.12-20 3-21 16-38t30.23-30.78Q580-510 596-537q16-27 16-58.61 0-50.39-37.5-83.89T485.55-713Q450-713 417-698t-54 44q-7 10-6.5 21.5t9.47 18.5q11.41 8 23.65 5 12.23-3 20.38-14 12.75-17.9 31.88-27.45Q461-660 482.77-660Z", "savings-fill": "M230-120q-21 0-39.49-13.96Q172.02-147.93 166-168q-25-86-41.54-148.46-16.54-62.46-26.37-109.68-9.82-47.22-13.95-83.79Q80-546.49 80-580q0-92 64-156t156-64h200q27-36 68.5-58t91.5-22q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22t-5.5 24l91 91h57q12.75 0 21.38 8.62Q880-642.75 880-630v227q0 10.24-5.5 18.12Q869-377 859-374l-91.93 30.3L713-163q-6.03 19.61-21.84 31.31Q675.34-120 655-120H540q-24.75 0-42.37-17.63Q480-155.25 480-180v-20h-80v20q0 24.75-17.62 42.37Q364.75-120 340-120H230Zm410-400q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520ZM490-620q12.75 0 21.38-8.68 8.62-8.67 8.62-21.5 0-12.82-8.62-21.32-8.63-8.5-21.38-8.5H350q-12.75 0-21.37 8.68-8.63 8.67-8.63 21.5 0 12.82 8.63 21.32 8.62 8.5 21.37 8.5h140Z", "content_copy": "M300-200q-24 0-42-18t-18-42v-560q0-24 18-42t42-18h440q24 0 42 18t18 42v560q0 24-18 42t-42 18H300Zm0-60h440v-560H300v560ZM180-80q-24 0-42-18t-18-42v-590q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v590h470q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32Q662.75-80 650-80H180Zm120-180v-560 560Z", "add": "M450-450H230q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h220v-220q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v220h220q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H510v220q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-220Z", "add_circle-fill": "M453-446v136q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63 8.5-8.62 8.5-21.37v-136h137q12.75 0 21.38-8.68 8.62-8.67 8.62-21.5 0-12.82-8.62-21.32-8.63-8.5-21.38-8.5H513v-144q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v144H310q-12.75 0-21.37 8.68-8.63 8.67-8.63 21.5 0 12.82 8.63 21.32 8.62 8.5 21.37 8.5h143Zm27.27 366q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Z", "chevron_right": "M530-481 353-658q-9-9-8.5-21t9.5-21q9-9 21.5-9t21.5 9l198 198q5 5 7 10t2 11q0 6-2 11t-7 10L396-261q-9 9-21 8.5t-21-9.5q-9-9-9-21.5t9-21.5l176-176Z", "chevron_left": "m406-481 177 177q9 9 8.5 21t-9.5 21q-9 9-21.5 9t-21.5-9L341-460q-5-5-7-10t-2-11q0-6 2-11t7-10l199-199q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L406-481Z", "check": "m378-332 363-363q9.27-9 21.64-9 12.36 0 21.36 9.05 9 9.06 9 21.5 0 12.45-9 21.45L399-267q-9 9-21 9t-21-9L175-449q-9-9.07-8.5-21.53.5-12.47 9.55-21.47 9.06-9 21.5-9 12.45 0 21.45 9l159 160Z", "check_circle-fill": "m421-389-98-98q-9-9-22-9t-23 10q-9 9-9 22t9 22l122 123q9 9 21 9t21-9l239-239q10-10 10-23t-10-23q-10-9-23.5-8.5T635-603L421-389Zm59 309q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-156t86-127Q252-817 325-848.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80Z", "arrow_upward": "M450-686 223-459q-9 9-21 9t-21-9q-9-9-9-21t9-21l278-278q5-5 10-7t11-2q6 0 11 2t10 7l278 278q9 9 9 21t-9 21q-9 9-21 9t-21-9L510-686v496q0 13-8.5 21.5T480-160q-13 0-21.5-8.5T450-190v-496Z", "arrow_downward": "M450-274v-496q0-13 8.5-21.5T480-800q13 0 21.5 8.5T510-770v496l227-227q9-9 21-9t21 9q9 9 9 21t-9 21L501-181q-5 5-10 7t-11 2q-6 0-11-2t-10-7L181-459q-9-9-9-21t9-21q9-9 21-9t21 9l227 227Z", "download": "M479.87-325q-5.87 0-10.87-2-5-2-10-7L308-485q-9-9.27-8.5-21.64.5-12.36 9.11-21.36 9.39-9 21.89-9t21.5 9l98 99v-341q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v341l99-99q8.8-9 20.9-8.5 12.1.5 21.49 9.5 8.61 9 8.61 21.5t-9 21.5L501-334q-5 5-10.13 7-5.14 2-11 2ZM220-160q-24 0-42-18t-18-42v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113h520v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113q0 24-18 42t-42 18H220Z", "upload": "M220-160q-24 0-42-18t-18-42v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113h520v-113q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v113q0 24-18 42t-42 18H220Zm230-524-99 99q-8.8 9-20.9 8.5-12.1-.5-21.49-9.5-8.61-9-8.61-21.5t9-21.5l150-150q5-5 10.13-7 5.14-2 11-2 5.87 0 10.87 2 5 2 10 7l151 151q9 9 9 21t-8.61 21q-9.39 9-21.89 9t-21.5-9l-99-98v341q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-341Z", "table_view": "M300-80q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h520q24 0 42 18t18 42v520q0 24-18 42t-42 18H300Zm0-60h230v-147H300v147Zm290 0h230v-147H590v147ZM109.82-244Q97-244 88.5-252.63 80-261.25 80-274v-546q0-24 18-42t42-18h546q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H140v546q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63ZM300-347h230v-148H300v148Zm290 0h230v-148H590v148ZM300-555h520v-105H300v105Z", "upload_file": "M452-403v171q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63 12.82 0 21.32-8.63 8.5-8.62 8.5-21.37v-171l61 61q3 3 15-2t22.5-9q10.5-4 14.5-3.5T615-342q9-9 8.5-21t-9.5-21L501-494q-5-5-10.13-7-5.14-2-11-2-5.87 0-10.87 2-5 2-10 7L347-382q-9 9-9 21t9 21.39q9 8.61 21 8.61t21-9l63-63ZM220-80q-24 0-42-18t-18-42v-680q0-24 18-42t42-18h336q12.44 0 23.72 5T599-862l183 183q8 8 13 19.28 5 11.28 5 23.72v496q0 24-18 42t-42 18H220Zm331-584v-156H220v680h520v-494H581q-12.75 0-21.37-8.63Q551-651.25 551-664ZM220-820v186-186 680-680Z", "delete": "M261-120q-24.75 0-42.37-17.63Q201-155.25 201-180v-570h-11q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h158q0-13 8.63-21.5 8.62-8.5 21.37-8.5h204q12.75 0 21.38 8.62Q612-822.75 612-810h158q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5h-11v570q0 24.75-17.62 42.37Q723.75-120 699-120H261Zm438-630H261v570h438v-570ZM397.18-266q12.82 0 21.32-8.63 8.5-8.62 8.5-21.37v-339q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v339q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63Zm166 0q12.82 0 21.32-8.63 8.5-8.62 8.5-21.37v-339q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v339q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63ZM261-750v570-570Z", "undo": "M289-200q-13 0-21.5-8.5T259-230q0-13 8.5-21.5T289-260h280q70 0 120.5-46.5T740-422q0-69-50.5-115.5T569-584H274l93 93q9 9 9 21t-9 21q-9 9-21 9t-21-9L181-593q-5-5-7-10t-2-11q0-6 2-11t7-10l144-144q9-9 21-9t21 9q9 9 9 21t-9 21l-93 93h294q95 0 163.5 64T800-422q0 94-68.5 158T568-200H289Z", "calculate-fill": "M314-316v63q0 10.83 7.12 17.92 7.11 7.08 18 7.08 10.88 0 17.88-7.08 7-7.09 7-17.92v-63h63q10.83 0 17.92-7.12 7.08-7.11 7.08-18 0-10.88-7.08-17.88-7.09-7-17.92-7h-63v-63q0-10.83-7.12-17.92-7.11-7.08-18-7.08-10.88 0-17.88 7.08-7 7.09-7 17.92v63h-63q-10.83 0-17.92 7.12-7.08 7.11-7.08 18 0 10.88 7.08 17.88 7.09 7 17.92 7h63Zm240 53h152q10.4 0 17.2-7.12 6.8-7.11 6.8-18 0-10.88-6.5-17.38Q717-312 706-312H553q-10.4 0-17.2 6.5-6.8 6.5-6.8 17.38 0 10.89 7.08 18Q543.17-263 554-263Zm0-107h151q10.83 0 17.92-7.12 7.08-7.11 7.08-18 0-10.88-7.08-17.88-7.09-7-17.92-7H554q-10.83 0-17.92 7.12-7.08 7.11-7.08 18 0 10.88 7.08 17.88 7.09 7 17.92 7ZM266-605h146q10.83 0 17.92-7.12 7.08-7.11 7.08-18 0-10.88-7.08-17.88-7.09-7-17.92-7H266q-10.83 0-17.92 7.12-7.08 7.11-7.08 18 0 10.88 7.08 17.88 7.09 7 17.92 7Zm-86 485q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm447-474 43 43q7.64 8 17.82 8t18.18-8q8-8 8-18t-8-18l-43-43 43-43q8-7.64 8-17.82T706-709q-8-8-18.18-8T670-709l-43 43-43-43q-7.64-8-17.82-8T548-709q-8 8-8 18.18t8 17.82l43 43-43 43q-8 7.71-8 18t8 18q7.64 8 17.82 8t18.18-8l43-43Z", "dark_mode-fill": "M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z", "south_west": "M230-200q-12.75 0-21.37-8.63Q200-217.25 200-230v-336q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v264l477-477q9-9 21-9t21 9q9 9 9 21t-9 21L302-260h264q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H230Z", "north_east": "M700-658 223-181q-9 9-21 9t-21-9q-9-9-9-21t9-21l477-477H394q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h336q12.75 0 21.38 8.62Q760-742.75 760-730v336q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-264Z", "warning-fill": "M92-120q-9 0-15.65-4.13Q69.7-128.25 66-135q-4.17-6.6-4.58-14.3Q61-157 66-165l388-670q5-8 11.5-11.5T480-850q8 0 14.5 3.5T506-835l388 670q5 8 4.58 15.7-.41 7.7-4.58 14.3-3.7 6.75-10.35 10.87Q877-120 868-120H92Zm392.18-117q12.82 0 21.32-8.68 8.5-8.67 8.5-21.5 0-12.82-8.68-21.32-8.67-8.5-21.5-8.5-12.82 0-21.32 8.68-8.5 8.67-8.5 21.5 0 12.82 8.68 21.32 8.67 8.5 21.5 8.5Zm0-111q12.82 0 21.32-8.63 8.5-8.62 8.5-21.37v-164q0-12.75-8.68-21.38-8.67-8.62-21.5-8.62-12.82 0-21.32 8.62-8.5 8.63-8.5 21.38v164q0 12.75 8.68 21.37 8.67 8.63 21.5 8.63Z", "event_repeat": "M180-80q-24 0-42-18t-18-42v-620q0-24 18-42t42-18h65v-28q0-13.6 9.2-22.8 9.2-9.2 22.8-9.2 14.02 0 23.51 9.2Q310-861.6 310-848v28h340v-28q0-13.6 9.2-22.8 9.2-9.2 22.8-9.2 14.03 0 23.51 9.2Q715-861.6 715-848v28h65q24 0 42 18t18 42v270q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-80H180v430h294q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32Q486.75-80 474-80H180ZM760 0q-64 0-114.5-35.5T573-128q-5-11 2.5-21.5T595-160q14 0 25.5 8.5T639-130q18 32 50 51t71 19q58 0 99-41t41-99q0-58-41-99t-99-41q-29 0-54 10.5T662-300h28q13 0 21.5 8.5T720-270q0 13-8.5 21.5T690-240H590q-12.75 0-21.37-8.63Q560-257.25 560-270v-100q0-13 8.5-21.5T590-400q13 0 21.5 8.5T620-370v27q27-26 63-41.5t77-15.5q83 0 141.5 58.5T960-200q0 83-58.5 141.5T760 0ZM180-630h600v-130H180v130Zm0 0v-130 130Z", "shopping_cart-fill": "M286.79-81Q257-81 236-102.21t-21-51Q215-183 236.21-204t51-21Q317-225 338-203.79t21 51Q359-123 337.79-102t-51 21Zm400 0Q657-81 636-102.21t-21-51Q615-183 636.21-204t51-21Q717-225 738-203.79t21 51Q759-123 737.79-102t-51 21ZM205-801h589.07q22.97 0 34.95 21 11.98 21-.02 42L694-495q-11 19-28.56 30.5T627-453H324l-56 104h461q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H277q-42 0-60.5-28t.5-63l64-118-152-322H81q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q68.25-880 81-880h68q9 0 16.2 4.43 7.2 4.44 10.8 12.57l29 62Z", "ios_share": "M220-40q-24 0-42-18t-18-42v-509q0-24 18-42t42-18h139q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H220v509h520v-509H599q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h141q24 0 42 18t18 42v509q0 24-18 42t-42 18H220Zm229-764-67 67q-9 9-21 9t-21.39-9q-8.61-9-8.61-21.5t9-21.5l118-119q9-9 21-9t21 9l119 119q9 9 9 21.16t-8.61 21Q610-729 597.53-729q-12.46 0-21.53-9l-67-66v427q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-427Z", "drag_handle": "M190-390q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h580q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H190Zm0-120q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h580q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H190Z", "credit_card-fill": "M140-160q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h680q24 0 42 18t18 42v520q0 24-18 42t-42 18H140Zm0-342h680v-129H140v129Z", "south_east": "M658-260 181-737q-9-9-9-21t9-21q9-9 21-9t21 9l477 477v-264q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v336q0 12.75-8.62 21.37Q742.75-200 730-200H394q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h264Z"};
@@ -593,7 +625,13 @@ const dateKey = d => monthKey(d) + '-' + pad(d.getDate());
 function addMonths(mk, n) { const [y, m] = mk.split('-').map(Number); return monthKey(new Date(y, m - 1 + n, 1)); }
 function monthLabel(mk) { const [y, m] = mk.split('-').map(Number); return y + '年' + m + '月'; }
 const nf = new Intl.NumberFormat('ja-JP');
-const yen = n => (n < 0 ? '−¥' : '¥') + nf.format(Math.abs(Math.round(n)));
+const yenFmt = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' });
+const yenSFmt = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', signDisplay: 'exceptZero' });
+const pctFmt = new Intl.NumberFormat('ja-JP', { style: 'percent', maximumFractionDigits: 1 });
+const manFmt = new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1, signDisplay: 'exceptZero' });
+const yen = n => yenFmt.format(Math.round(n) || 0);          // ￥1,000 / -￥1,000
+const yenS = n => yenSFmt.format(Math.round(n) || 0);        // +￥1,000 / -￥1,000（増えるか減るかを出す）
+const pct = v => pctFmt.format(Number.isFinite(v) ? v : 0);
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 function toHalf(s) { return String(s).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[－ー−]/g, '-'); }
 function parseAmount(str) { const s = toHalf(str).replace(/[,，\s円¥￥+]/g, ''); return /^-?\d+$/.test(s) ? parseInt(s, 10) : NaN; }
@@ -609,6 +647,24 @@ const REPEATS = [['same', '同じ額', '来月も同じ金額で入ります'], 
    ========================================================= */
 // 口座に入れる額は、設定した単位（初期は1,000円）で繰り上げる
 function roundUp(v) { const u = state.roundUnit || 0; return u && v > 0 ? Math.ceil(v / u) * u : v; }
+function balanceOf(m) {
+  const inc = sum(m.income.map(i => i.amount));
+  const S = id => sum(m.out.filter(i => catOf(i) === id).map(amt));
+  const fixed = S('fixed'), living = S('living'), saving = S('saving');
+  const surplus = inc - fixed - living;                     // ＋なら黒字、−なら赤字
+  return { inc, fixed, living, saving, surplus, rate: inc ? surplus / inc : 0 };
+}
+// 目安（手取りに対して）：50/30/20 ルールを当てはめたもの
+const GUIDE = { fixed: 0.5, living: 0.3, save: 0.2 };
+function balanceHero(m) {
+  const b = balanceOf(m), t = totals(m), black = b.surplus >= 0;
+  return '<section class="hero num bal">' +
+    '<div class="bal-tag ' + (black ? 'black' : 'red') + '">' + ic(black ? 'check_circle-fill' : 'warning-fill') + (black ? '黒字' : '赤字') + '</div>' +
+    '<div class="big' + (black ? '' : ' neg') + '">' + yenS(b.surplus) + '</div>' +
+    '<div class="stats"><div><span>貯金率</span><b class="' + (b.rate >= GUIDE.save ? 'ok' : b.rate < 0 ? 'ng' : '') + '">' + pct(b.rate) + '</b></div>' +
+    '<div><span>振り分けのこり</span><b class="' + (t.rest < 0 ? 'ng' : t.rest === 0 ? 'ok' : '') + '">' + yen(t.rest) + '</b></div></div>' +
+    (t.rest < 0 ? '<div><button class="cover-btn" id="coverBtn">' + ic('savings-fill') + '貯金から出して補う</button></div>' : '') + '</section>';
+}
 function totals(m) {
   const inc = sum(m.income.map(i => i.amount));
   const out = sum(rowsOf(m).map(r => r.send));
@@ -775,7 +831,7 @@ function renderTable() {
         (i.pending ? '<span class="value pend-v">未入力</span>' : '<span class="value num' + (i.amount ? '' : ' zero') + (i.withdraw ? ' wd' : '') + '">' + yen(val(i)) + '</span>') + chev() + '</button>';
     };
     secHtml += '<div class="group">' +
-      '<div class="cell sec-head">' + tile(sec.icon, sec.color) + '<span class="grow"><span class="title">' + sec.label + '</span><span class="sub">' + sec.items.length + '件</span></span><span class="value strong num">' + yen(total) + '</span><span class="chev-space"></span></div>' +
+      '<div class="cell sec-head">' + tile(sec.icon, sec.color) + '<span class="grow"><span class="title">' + sec.label + '</span></span><span class="value strong num">' + yen(total) + '</span><span class="chev-space"></span></div>' +
       groups.map(g => (split ? '<div class="cell sub-head"><span class="grow"><span class="title">' + esc(g.a ? g.a.name + (g.a.use ? '　' + g.a.use : '') : '口座が決まっていない') + '</span></span><span class="value num">' + yen(sum(g.items.map(val))) + '</span><span class="chev-space"></span></div>' : '') + g.items.map(itemRow).join('')).join('') +
       '<button class="cell link add-cell" data-add="' + sec.key + '">' + ic('add_circle-fill', 'add-ic') + '<span class="grow"><span class="title blue">' + sec.label + 'を追加</span></span></button>' +
       '</div>';
@@ -787,21 +843,22 @@ function renderTable() {
   const t = totals(m);
   const line = (label, v, sub) => '<div class="cell"><span class="grow"><span class="title">' + label + '</span>' + (sub ? '<span class="sub">' + sub + '</span>' : '') + '</span><span class="value num">' + v + '</span><span class="chev-space"></span></div>';
   // まとめ（いちばん上）：入ってくるお金から全部を引いて、プラスマイナス0にするのが目標
-  const st = t.rest === 0 ? '<div class="pill ok">' + ic('check_circle-fill') + 'ぴったり0です</div>'
-    : t.rest > 0 ? '<div class="pill ok">' + ic('check_circle-fill') + yen(t.rest) + ' あまっています</div>'
-    : '<div class="pill neg">' + ic('warning-fill') + yen(-t.rest) + ' たりません</div>';
-  html += '<section class="hero num"><div class="cap">のこり</div><div class="big' + (t.rest < 0 ? ' neg' : '') + '">' + yen(t.rest) + '</div>' + st + '<div class="cap2">プラスマイナス0が目標</div></section>' +
+  const bl = balanceOf(m);
+  const bold = (label, v, cls) => '<div class="cell"><span class="grow"><span class="title strong-t">' + label + '</span></span><span class="value strong num' + (cls ? ' ' + cls : '') + '">' + v + '</span><span class="chev-space"></span></div>';
+  html += balanceHero(m) +
     '<div class="group-head"><span>まとめ</span></div><div class="group">' +
-    line('収入', '+' + yen(sums.income)) +
-    line('固定費', yen(-sums.fixed)) +
-    line('生活費', yen(-sums.living)) +
-    line('貯金&積立', (sums.saving < 0 ? '+' : '') + yen(-sums.saving), sums.saving < 0 ? '貯金から出す分のほうが多い' : '') +
-    (leftUsed ? line('先月の余り', '+' + yen(leftUsed)) : '') +
-    (roundUpBy ? line('口座ごとの繰り上げ', yen(-roundUpBy)) : '') +
-    '<div class="cell"><span class="grow"><span class="title strong-t">のこり</span><span class="sub">0になれば、ぴったり分けられています</span></span><span class="value strong num' + (t.rest < 0 ? ' neg-v' : '') + '">' + yen(t.rest) + '</span><span class="chev-space"></span></div>' +
-    '</div>' + secHtml + '<p class="group-foot">項目をタップすると金額を変えられます。のこりは「口座移動」と同じです。</p>';
+    line('収入', yenS(sums.income)) +
+    line('固定費', yenS(-sums.fixed)) +
+    line('生活費', yenS(-sums.living)) +
+    bold(bl.surplus >= 0 ? '黒字' : '赤字', yenS(bl.surplus), bl.surplus < 0 ? 'neg-v' : '') +
+    line('貯金&積立', yenS(-sums.saving)) +
+    (leftUsed ? line('先月の余り', yenS(leftUsed)) : '') +
+    (roundUpBy ? line('口座ごとの繰り上げ', yenS(-roundUpBy)) : '') +
+    bold('振り分けのこり', yen(t.rest), t.rest < 0 ? 'neg-v' : '') +
+    '</div>' + secHtml;
   box.innerHTML = html;
   box.querySelectorAll('[data-tid]').forEach(b => b.addEventListener('click', () => quickEdit(b.dataset.tk, b.dataset.tid)));
+  if ($('coverBtn')) $('coverBtn').addEventListener('click', () => coverFromSavings(-t.rest));
   box.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.add;
     if (k === 'income') editItem('income', null, '', null); else editItem('out', null, '', null, k);
@@ -815,88 +872,41 @@ function renderGraph() {
   const [y, mo] = viewMonth.split('-').map(Number);
   const m = state.months[viewMonth];
   if (!m) return emptyMonth(box);
-  const t = totals(m);
-  const rows = rowsOf(m);
-  const S = id => sum(m.out.filter(i => catOf(i) === id && !i.withdraw).map(i => i.amount));
-  const wdSum = sum(m.out.filter(i => i.withdraw).map(i => i.amount));
-  const leftUsed = sum(rows.filter(r => r.a.id && r.send >= 0).map(r => Math.max(0, Math.min(r.left, r.total))));
-  const roundUpBy = sum(rows.filter(r => r.send >= 0).map(r => r.send - Math.max(0, r.total - r.left)));
-  const ins = [['収入', t.inc, 'var(--cv-income)'], ['貯金から出す', wdSum, 'var(--cv-wd)'], ['先月の余り', leftUsed, 'var(--cv-neutral)']].filter(x => x[1] > 0);
-  const outs = [['固定費', S('fixed'), 'var(--cv-fixed)'], ['生活費', S('living'), 'var(--cv-living)'], ['貯金&積立', S('saving'), 'var(--cv-saving)'], ['口座ごとの繰り上げ', roundUpBy, 'var(--cv-neutral)']].filter(x => x[1] > 0);
-  const inT = sum(ins.map(x => x[1])), outT = sum(outs.map(x => x[1]));
-  const W = 340, L = 0, R = W;
-  // 1) 入ってくる・出ていく（同じ長さならプラスマイナス0）
-  const maxT = Math.max(inT, outT, 1);
-  const bar = (yy, parts, total, gapLabel) => {
-    let x = L, out = '';
-    const sc = (R - L) / maxT;
-    const id = 'clip' + yy;
-    out += '<clipPath id="' + id + '"><rect x="' + L + '" y="' + yy + '" width="' + Math.max(0, total * sc) + '" height="26" rx="4"/></clipPath><g clip-path="url(#' + id + ')">';
-    parts.forEach(([label, v, col], k) => {
-      const w = v * sc;
-      out += '<rect class="cv-mark" x="' + x.toFixed(1) + '" y="' + yy + '" width="' + Math.max(0, w - (k < parts.length - 1 ? 2 : 0)).toFixed(1) + '" height="26" fill="' + col + '" data-tip="' + esc(label + ' ' + yen(v)) + '"/>';
-      x += w;
-    });
-    out += '</g>';
-    if (gapLabel && total < maxT) {
-      const gx = L + total * sc;
-      out += '<rect x="' + (gx + 2).toFixed(1) + '" y="' + (yy + 1) + '" width="' + Math.max(0, (maxT - total) * sc - 3).toFixed(1) + '" height="24" rx="4" fill="none" stroke="' + gapLabel[1] + '" stroke-width="1.5" stroke-dasharray="4 3" class="cv-mark" data-tip="' + esc(gapLabel[0]) + '"/>';
-    }
-    return out;
+  const b = balanceOf(m);
+  // 1) 収入に対する割合（目安の線つき）
+  const ratioRow = (label, v, guide, kind, color) => {
+    const ok = kind === 'max' ? v <= guide : v >= guide;
+    const w = Math.max(0, Math.min(1, v)) * 100;
+    return '<div class="rt">' +
+      '<div class="rt-head"><span class="rt-l">' + label + '</span><span class="rt-v num' + (v < 0 ? ' ng' : '') + '">' + pct(v) + '</span></div>' +
+      '<div class="rt-bar"><div class="rt-fill" style="width:' + w + '%;background:' + color + '"></div><div class="rt-mark" style="left:' + guide * 100 + '%"></div></div>' +
+      '<div class="rt-guide ' + (ok ? 'ok' : 'ng') + '">' + ic(ok ? 'check_circle-fill' : 'warning-fill') + '目安 ' + pct(guide) + (kind === 'max' ? ' 以内' : ' 以上') + '</div></div>';
   };
-  const gapIn = t.rest < 0 ? [yen(-t.rest) + ' たりない', 'var(--red)'] : null;
-  const gapOut = t.rest > 0 ? ['のこり ' + yen(t.rest), 'var(--label3)'] : null;
-  const svg1 = '<svg class="cv" viewBox="0 0 ' + W + ' 104" role="img" aria-label="入ってくるお金と出ていくお金">' +
-    '<text x="0" y="12" class="cv-t">入ってくる ' + yen(inT) + '</text>' + bar(18, ins, inT, gapIn) +
-    '<text x="0" y="66" class="cv-t">出ていく ' + yen(outT) + '</text>' + bar(72, outs, outT, gapOut) + '</svg>';
-  const legend = parts => '<div class="cv-legend">' + parts.map(([l, v, c]) => '<div class="cv-li"><span class="cv-sw" style="background:' + c + '"></span><span class="cv-l">' + l + '</span><span class="cv-v num">' + yen(v) + '</span></div>').join('') + '</div>';
-  const st = t.rest === 0 ? 'ぴったり0です' : t.rest > 0 ? yen(t.rest) + ' あまっています' : yen(-t.rest) + ' たりません';
-  // 2) 払うもの 大きい順（色は区分）
-  const top = m.out.filter(i => !i.withdraw && i.amount > 0).slice().sort((p, q) => q.amount - p.amount);
-  const shown = top.slice(0, 8), rest = top.slice(8);
-  const items = shown.map(i => [i.name, i.amount, 'var(--cv-' + catOf(i) + ')']).concat(rest.length ? [['ほか ' + rest.length + '件', sum(rest.map(i => i.amount)), 'var(--cv-neutral)']] : []);
-  const maxI = Math.max(1, ...items.map(x => x[1]));
-  const rowH = 30, lw = 120;
-  const svg2 = '<svg class="cv" viewBox="0 0 ' + W + ' ' + (items.length * rowH + 4) + '" role="img" aria-label="払うもの 大きい順">' + items.map(([l, v, c], k) => {
-    const yy = k * rowH + 4, w = Math.max(2, (W - lw - 70) * v / maxI);
-    return '<text x="' + (lw - 8) + '" y="' + (yy + 15) + '" class="cv-t" text-anchor="end">' + esc(l.length > 9 ? l.slice(0, 9) + '…' : l) + '</text>' +
-      '<rect class="cv-mark" x="' + lw + '" y="' + (yy + 3) + '" width="' + w.toFixed(1) + '" height="16" rx="4" fill="' + c + '" data-tip="' + esc(l + ' ' + yen(v)) + '"/>' +
-      '<text x="' + (lw + w + 6).toFixed(1) + '" y="' + (yy + 15) + '" class="cv-v2">' + yen(v) + '</text>';
-  }).join('') + '</svg>';
-  // 3) 月ごとの推移（収入と、区分ごとに積んだ支出。目盛りは1つ）
+  const inc = b.inc || 1;
+  const card1 = '<div class="group-head"><span>収入に対する割合</span></div><div class="group cv-card">' +
+    ratioRow('固定費', b.fixed / inc, GUIDE.fixed, 'max', 'var(--cv-fixed)') +
+    ratioRow('生活費', b.living / inc, GUIDE.living, 'max', 'var(--cv-living)') +
+    ratioRow('貯金率', b.rate, GUIDE.save, 'min', 'var(--cv-saving)') + '</div>';
+  // 2) 月ごとの黒字・赤字（0を真ん中にした棒。目盛りは1つ）
   const months = Object.keys(state.months).filter(k => k <= viewMonth).sort().slice(-6);
-  const data = months.map(k => { const mm = state.months[k]; const s = id => sum(mm.out.filter(i => catOf(i) === id && !i.withdraw).map(i => i.amount)); return { k, inc: sum(mm.income.map(i => i.amount)), fixed: s('fixed'), living: s('living'), saving: s('saving') }; });
-  const maxM = Math.max(1, ...data.map(d => Math.max(d.inc, d.fixed + d.living + d.saving)));
-  const step = [50000, 100000, 200000, 250000, 500000, 1000000].find(v => maxM / v <= 5) || 1000000;
-  const top3 = Math.ceil(maxM / step) * step;
-  const H = 170, base = 140, gl = 44, gw = (W - gl) / Math.max(1, data.length), bw = Math.min(22, gw / 2 - 6);
-  const yv = v => base - (v / top3) * (base - 10);
-  let g3 = '';
-  for (let v = 0; v <= top3; v += step) g3 += '<line x1="' + gl + '" x2="' + W + '" y1="' + yv(v).toFixed(1) + '" y2="' + yv(v).toFixed(1) + '" class="' + (v ? 'cv-grid' : 'cv-base') + '"/><text x="' + (gl - 6) + '" y="' + (yv(v) + 4).toFixed(1) + '" class="cv-ax" text-anchor="end">' + (v / 10000) + '万</text>';
+  const data = months.map(k => ({ k, v: balanceOf(state.months[k]).surplus }));
+  const maxA = Math.max(1, ...data.map(d => Math.abs(d.v)));
+  const W = 340, H = 220, top = 24, bottom = 196, zero = (top + bottom) / 2, half = (bottom - top) / 2;
+  const gw = W / Math.max(1, data.length), bw = Math.min(36, gw * 0.55);
+  let g = '<line x1="0" x2="' + W + '" y1="' + zero + '" y2="' + zero + '" class="cv-base"/>';
   data.forEach((d, k) => {
-    const cx = gl + gw * k + gw / 2;
-    const x1 = cx - bw - 2, x2 = cx + 2;
-    g3 += '<rect class="cv-mark" x="' + x1.toFixed(1) + '" y="' + yv(d.inc).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (base - yv(d.inc)).toFixed(1) + '" rx="3" fill="var(--cv-income)" data-tip="' + esc(monthLabel(d.k) + ' 収入 ' + yen(d.inc)) + '"/>';
-    let acc = 0;
-    [['fixed', '固定費'], ['living', '生活費'], ['saving', '貯金&積立']].forEach(([id, l]) => {
-      const v = d[id]; if (!v) return;
-      const yTop = yv(acc + v), yBot = yv(acc);
-      g3 += '<rect class="cv-mark" x="' + x2.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, yBot - yTop - (acc ? 2 : 0)).toFixed(1) + '" fill="var(--cv-' + id + ')" data-tip="' + esc(monthLabel(d.k) + ' ' + l + ' ' + yen(v)) + '"/>';
-      acc += v;
-    });
-    g3 += '<text x="' + cx.toFixed(1) + '" y="' + (base + 18) + '" class="cv-ax" text-anchor="middle">' + Number(d.k.slice(5)) + '月</text>';
+    const cx = gw * k + gw / 2, h = Math.abs(d.v) / maxA * (half - 18), up = d.v >= 0;
+    const y0 = up ? zero - h : zero;
+    g += '<rect class="cv-mark" x="' + (cx - bw / 2).toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="4" fill="' + (up ? 'var(--cv-good)' : 'var(--cv-bad)') + '" data-tip="' + esc(monthLabel(d.k) + ' ' + (up ? '黒字 ' : '赤字 ') + yenS(d.v)) + '"/>' +
+      '<text x="' + cx.toFixed(1) + '" y="' + (up ? y0 - 6 : y0 + h + 14).toFixed(1) + '" class="cv-v2" text-anchor="middle">' + manFmt.format(Math.round(d.v)) + '</text>' +
+      '<text x="' + cx.toFixed(1) + '" y="' + (H - 4) + '" class="cv-ax" text-anchor="middle">' + Number(d.k.slice(5)) + '月</text>';
   });
-  const svg3 = '<svg class="cv" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="月ごとの収入と支出">' + g3 + '</svg>';
-  box.innerHTML = largeTitle(mo + '月', y + '年') + monthSeg() +
-    '<div class="group-head"><span>入ってくる・出ていく</span></div><div class="group cv-card">' + svg1 +
-      '<div class="cv-note num">' + st + '（2本の長さがそろえばプラスマイナス0）</div>' + legend(ins.concat(outs)) + '</div>' +
-    '<div class="group-head"><span>払うもの 大きい順</span></div><div class="group cv-card">' + svg2 + legend([['固定費', S('fixed'), 'var(--cv-fixed)'], ['生活費', S('living'), 'var(--cv-living)'], ['貯金&積立', S('saving'), 'var(--cv-saving)']]) + '</div>' +
-    '<div class="group-head"><span>月ごとの収入と支出</span></div><div class="group cv-card">' + svg3 +
-      '<div class="cv-legend"><div class="cv-li"><span class="cv-sw" style="background:var(--cv-income)"></span><span class="cv-l">収入（左の棒）</span></div><div class="cv-li"><span class="cv-sw" style="background:var(--cv-fixed)"></span><span class="cv-l">固定費</span></div><div class="cv-li"><span class="cv-sw" style="background:var(--cv-living)"></span><span class="cv-l">生活費</span></div><div class="cv-li"><span class="cv-sw" style="background:var(--cv-saving)"></span><span class="cv-l">貯金&積立（右の棒に積む）</span></div></div></div>' +
-    '<p class="group-foot">棒をタップすると金額が出ます。貯金から出す分は「入ってくる」に入れています。</p><div class="cv-tip" id="cvTip" role="status"></div>';
+  const card2 = '<div class="group-head"><span>月ごとの黒字・赤字</span></div><div class="group cv-card"><svg class="cv" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="月ごとの黒字と赤字">' + g + '</svg></div>';
+  box.innerHTML = largeTitle(mo + '月', y + '年') + monthSeg() + balanceHero(m) + card1 + card2 + '<div class="cv-tip" id="cvTip" role="status"></div>';
+  if ($('coverBtn')) $('coverBtn').addEventListener('click', () => coverFromSavings(-totals(m).rest));
   // タップ（マウスなら乗せる）で金額を出す
   const tip = $('cvTip');
-  const show = (el, e) => { tip.textContent = el.dataset.tip; tip.classList.add('show'); const r = box.getBoundingClientRect(); const px = (e.clientX || el.getBoundingClientRect().left) - r.left; const py = (e.clientY || el.getBoundingClientRect().top) - r.top; tip.style.left = Math.max(8, Math.min(r.width - 8 - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px'; tip.style.top = (py - 44) + 'px'; };
+  const show = (el, e) => { tip.textContent = el.dataset.tip; tip.classList.add('show'); const r = box.getBoundingClientRect(); const er = el.getBoundingClientRect(); const px = (e && e.clientX ? e.clientX : er.left + er.width / 2) - r.left; const py = er.top - r.top; tip.style.left = Math.max(8, Math.min(r.width - 8 - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px'; tip.style.top = (py - 40) + 'px'; };
   box.querySelectorAll('.cv-mark').forEach(el => { el.addEventListener('click', e => { e.stopPropagation(); show(el, e); }); el.addEventListener('mouseenter', e => show(el, e)); el.addEventListener('mouseleave', () => tip.classList.remove('show')); });
   box.addEventListener('click', () => tip.classList.remove('show'));
 }
@@ -929,18 +939,18 @@ function movesOf(m) {
   if (lost) list.push({ a: lost.a, r: lost, dir: 'in', amount: lost.send, note: '口座を選んでください', incoming: 0 });
   return list;
 }
-const DIR = { out: ['出す', '−'], in: ['入れる', '+'], cash: ['現金でおろす', '+'], stay: ['そのまま', ''] };
+const DIR = { out: '出す', in: '入れる', cash: 'おろす', stay: 'そのまま' };
 function moveRow(m, mv) {
   const { a, r } = mv;
   const done = !!(a.id && m.done[a.id]);
   const pend = r ? r.items.filter(i => i.pending).length : 0;
   const keep = r ? Math.max(0, r.send) : 0;
-  const sub = [DIR[mv.dir][0] + (mv.dir === 'out' && mv.incoming && keep ? '（' + yen(keep) + ' 残す）' : ''), a.use || ''].filter(Boolean).join('｜');
+  const sub = [mv.dir === 'cash' ? 'おろす' : '', mv.dir === 'out' && mv.incoming && keep ? yen(keep) + ' 残す' : '', a.use || ''].filter(Boolean).join('・');
   const cell = '<div class="cell acc' + (done ? ' is-done' : '') + '">' +
     (a.id ? '<button class="ring" role="checkbox" aria-checked="' + done + '" aria-label="' + esc(a.name) + 'の移動をした" data-done-acc="' + a.id + '">' + ic('check') + '</button>' : '<span class="ring-space"></span>') +
     '<button class="acc-open" data-acc="' + a.id + '" data-has-row="' + (r ? 1 : 0) + '">' + accTile(a) +
       '<span class="grow"><span class="title">' + esc(a.name) + '</span><span class="sub">' + (pend ? '<span class="pend">未入力 ' + pend + '件</span>' : '') + esc(sub) + '</span></span>' +
-      '<span class="value strong num mv-' + mv.dir + (mv.amount ? '' : ' zero') + '">' + (mv.amount ? DIR[mv.dir][1] : '') + yen(mv.amount) + '</span>' + chev() + '</button></div>';
+      '<span class="value strong num mv-' + mv.dir + (mv.amount ? '' : ' zero') + '">' + yenS(mv.dir === 'out' ? -mv.amount : mv.amount) + '</span>' + chev() + '</button></div>';
   if (!a.id) return cell;
   return '<div class="swipe" data-acc="' + a.id + '"><div class="swipe-actions"><button class="sw-btn ' + (done ? 'gray' : 'green') + '" data-swipe-done="' + a.id + '">' + ic(done ? 'undo' : 'check') + (done ? '戻す' : '完了') + '</button></div><div class="swipe-content">' + cell + '</div></div>';
 }
@@ -970,22 +980,17 @@ function renderPlan() {
   const incPend = m.income.filter(i => i.pending).length;
   const outSum = sum(moves.filter(x => x.dir === 'out').map(x => x.amount));
   const inSum = sum(moves.filter(x => x.dir === 'in' || x.dir === 'cash').map(x => x.amount));
-  const st = t.rest === 0 ? '<div class="pill ok">' + ic('check_circle-fill') + 'ぴったり0です</div>'
-    : t.rest > 0 ? '<div class="pill ok">' + ic('check_circle-fill') + yen(t.rest) + ' あまっています</div>'
-    : '<div class="pill neg">' + ic('warning-fill') + yen(-t.rest) + ' たりません</div><div><button class="cover-btn" id="coverBtn">' + ic('savings-fill') + '貯金から出して補う</button></div>';
   html +=
-    '<section class="hero num"><div class="cap">のこり</div><div class="big' + (t.rest < 0 ? ' neg' : '') + '">' + yen(t.rest) + '</div>' + st +
-      (pendN ? '<div class="pend-line">金額を入れていないものが ' + pendN + ' 件あります</div>' : '') + '</section>' +
+    balanceHero(m) + (pendN ? '<p class="pend-line center-text">未入力 ' + pendN + '件</p>' : '') +
     '<div class="group">' +
       '<button class="cell link" id="openIncome">' + tile('south_west', 'var(--green)') + '<span class="grow"><span class="title">入ってくる</span>' + (incPend ? '<span class="sub"><span class="pend">未入力 ' + incPend + '件</span></span>' : '') + '</span><span class="value num">' + yen(t.inc) + '</span>' + chev() + '</button>' +
       '<div class="cell">' + tile('north_east', 'var(--red)') + '<span class="grow"><span class="title">口座から出す</span></span><span class="value num">' + yen(outSum) + '</span><span class="chev-space"></span></div>' +
-      '<div class="cell">' + tile('south_east', 'var(--blue)') + '<span class="grow"><span class="title">口座に入れる</span><span class="sub">現金でおろす分も</span></span><span class="value num">' + yen(inSum) + '</span><span class="chev-space"></span></div>' +
+      '<div class="cell">' + tile('south_east', 'var(--blue)') + '<span class="grow"><span class="title">口座に入れる</span></span><span class="value num">' + yen(inSum) + '</span><span class="chev-space"></span></div>' +
     '</div>' +
     '<div class="group-head"><span>口座移動</span><span class="num">' + doneN + ' / ' + accN + ' 完了</span></div>' +
     '<div class="group" id="accList">' + moves.map(mv => moveRow(m, mv)).join('') +
       '<button class="cell link add-cell" id="addOut">' + ic('add_circle-fill', 'add-ic') + '<span class="grow"><span class="title blue">払うものを追加</span></span></button>' +
     '</div>' +
-    '<p class="group-foot">上から順に移動して、終わったら左の丸をタップします（行を左にスワイプしても完了にできます）。並び順は「設定」の口座の順です。出す額は1,000円単位で切り下げ、入れる額は切り上げています。</p>' +
     '<div class="group">' +
       '<button class="cell link" id="openLeft">' + tile('savings-fill', 'var(--pink)') + '<span class="grow"><span class="title">先月の余り</span></span><span class="value">' + (rows.some(r => r.left) ? '入力済み' : 'なし') + '</span>' + chev() + '</button>' +
       (latestMonthBefore(viewMonth) ? '<button class="cell link" id="copyPrev">' + tile('content_copy', 'var(--gray)') + '<span class="grow"><span class="title">先月の内容で入れ直す</span></span>' + chev() + '</button>' : '') +
@@ -1040,7 +1045,7 @@ function catSheet(cat) {
   openSheet({ title: c[1], left: '閉じる', right: ic('add'), rightLabel: '追加',
     body: '<section class="hero small num"><div class="cap">' + c[3] + '</div><div class="big">' + yen(sum(its.map(amt))) + '</div></section>' +
       '<div class="group">' + (its.length ? its.map(i => itemCell('out', i, payLabel(i))).join('') : '<div class="cell"><span class="grow sub-only">まだありません</span></div>') + '</div>' +
-      '<p class="group-foot">左にスワイプで削除。タップで金額を変えます。</p>',
+      '',
     onRight: () => editItem('out', null, '', () => catSheet(cat), cat) });
   bindItemCells('out', () => catSheet(cat));
 }
@@ -1073,7 +1078,7 @@ function incomeSheet() {
   openSheet({ title: '入ってくるお金', left: '閉じる', right: ic('add'), rightLabel: '追加',
     body: '<section class="hero small num"><div class="big">' + yen(t.inc) + '</div></section>' +
       '<div class="group">' + (m.income.length ? m.income.map(i => itemCell('income', i, accountById(i.acc) ? accountById(i.acc).name + 'に入る' : '')).join('') : '<div class="cell"><span class="grow sub-only">まだありません</span></div>') + '</div>' +
-      '<p class="group-foot">左にスワイプで削除。タップで金額を変えます。</p>',
+      '',
     onRight: () => editItem('income', null, '', incomeSheet) });
   bindItemCells('income', incomeSheet);
 }
@@ -1096,10 +1101,9 @@ function accountSheet(accId) {
             const its = r.items.filter(i => i.acc === c.id);
             return '<div class="group-head"><span>' + esc(c.name) + 'で払う</span><span class="num">' + yen(sum(its.map(amt))) + '</span></div><div class="group">' + its.map(i => itemCell('out', i, sub(i))).join('') +
               (accId ? '<button class="cell link add-cell" data-add-card="' + c.id + '">' + ic('add_circle-fill', 'add-ic') + '<span class="grow"><span class="title blue">' + esc(c.name) + 'で払うものを追加</span></span></button>' : '') + '</div>';
-          }).join('') + (cards.length && accId ? '<p class="group-foot">カードで払うものの合計も、この口座に入れる額に入っています。</p>' : '');
+          }).join('');
       })() +
       (accId ? '<div class="group-head"><span>先月の余り</span></div><div class="group"><label class="cell form"><span class="label">' + (r.a.kind === 'cash' ? '手元の現金' : '口座に残っている額') + '</span><input class="num" type="text" inputmode="numeric" id="sLeft" value="' + fmtInput(r.left) + '" placeholder="0"><span class="unit">円</span></label></div>' +
-        '<p class="group-foot">入れると、その分だけ入れる額が減ります。</p>' +
         '<div class="pad"><button class="big-btn' + (done ? ' done' : '') + '" id="sDone">' + ic('check') + (done ? '分けました' : '分けたら押す') + '</button></div>' : ''),
     onRight: accId ? () => editItem('out', null, accId, () => accountSheet(accId)) : null });
   bindItemCells('out', () => accountSheet(accId));
@@ -1364,7 +1368,7 @@ function renderSettings() {
       '<button class="cell link" id="expCode">' + tile('content_copy', 'var(--indigo)') + '<span class="grow"><span class="title">データをコードでコピー</span><span class="sub">ほかのブラウザやアプリに移すとき</span></span>' + chev() + '</button>' +
       '<button class="cell link" id="expCsv">' + tile('table_view', 'var(--green)') + '<span class="grow"><span class="title">表計算用に書き出す（CSV）</span></span>' + chev() + '</button>' +
       '<button class="cell link" id="impCsv">' + tile('upload_file', 'var(--green)') + '<span class="grow"><span class="title">表計算から読み込む（CSV）</span></span>' + chev() + '</button></div>' +
-    '<p class="group-foot">データはこのスマホの中だけにあります。機種変更やブラウザのデータ消去で消えるので、月に1回「バックアップを保存」してください。iPhone では、ホーム画面のアプリと Safari でデータの保存場所が別です。</p>' +
+    '<p class="group-foot">データはこのスマホの中だけにあります。月に1回「バックアップを保存」してください。</p>' +
     '<div class="group"><button class="cell link center-cell" id="delMonth"><span class="title red">' + monthLabel(viewMonth) + 'を削除</span></button><button class="cell link center-cell" id="wipe"><span class="title red">すべてのデータを削除</span></button></div>' +
     '<p class="group-foot center-text num">バージョン ' + APP_VERSION + '・' + Object.keys(state.months).length + 'か月分のデータ</p>';
   const syncPick = (sel, out) => { const s = $(sel); $(out).textContent = s.options[s.selectedIndex].text; };
@@ -1424,7 +1428,7 @@ function editAccount(a, presetKind) {
     $('aKindText').textContent = KIND[k].label;
     $('aPayCell').hidden = k !== 'card';
     const pa = accountById($('aPay').value); $('aPayText').textContent = pa ? pa.name : '選んでください';
-    $('aFoot').textContent = k === 'card' ? 'カードで払うものの合計は、引き落とし口座に入れる額に足されます。' : '用途を入れると、「今月」の口座の行に払うものの代わりに出ます。';
+    $('aFoot').textContent = '';
     if (!colorTouched) { color = DEF_COLOR[k]; $('sheetBody').querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-checked', String(x.dataset.color === color))); }
   };
   $('aPay').addEventListener('change', sync);
