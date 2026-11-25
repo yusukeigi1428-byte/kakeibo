@@ -18,31 +18,46 @@ const KEY = 'ここに合言葉';
 const SHEET = '_kakeibo_app';
 const CHUNK = 40000;   // 1つのセルに入る文字数（上限 50,000）より少なく
 
+// 読み書き（アプリからの通常の通信。フォームで送られたときは payload に入っている）
 function doPost(e) {
   let req = {};
-  try { req = JSON.parse(e.postData.contents); } catch (err) { return out_({ ok: false, error: 'bad' }); }
-  if (!KEY || KEY === 'ここに合言葉' || req.key !== KEY) return out_({ ok: false, error: 'key' });
-  if (req.action === 'get') return out_({ ok: true, doc: read_() });
+  try {
+    const raw = e && e.parameter && e.parameter.payload ? e.parameter.payload : e.postData.contents;
+    req = JSON.parse(raw);
+  } catch (err) { return out_({ ok: false, error: 'bad' }); }
+  return out_(handle_(req));
+}
+
+// ブラウザで URL を開いたときの確認用（データは出さない）と、
+// ブラウザが別サイトへの通信を止めたときの予備（JSONP：callback を付けて読む）
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.callback) {
+    if (!/^[A-Za-z0-9_]{1,64}$/.test(p.callback)) return out_({ ok: false, error: 'bad' });
+    const res = p.action ? handle_({ action: p.action, key: p.key }) : { ok: true, app: 'kakeibo' };
+    return ContentService.createTextOutput(p.callback + '(' + JSON.stringify(res) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return out_({ ok: true, app: 'kakeibo' });
+}
+
+function handle_(req) {
+  if (!KEY || KEY === 'ここに合言葉' || req.key !== KEY) return { ok: false, error: 'key' };
+  if (req.action === 'get') return { ok: true, doc: read_() };
   if (req.action === 'put') {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
       const cur = read_();
       // 相手が先に書き込んでいたら、上書きせずに今の内容を返す
-      if (cur && req.baseRev !== undefined && req.baseRev !== null && cur.rev !== req.baseRev) return out_({ ok: false, error: 'conflict', doc: cur });
+      if (cur && req.baseRev !== undefined && req.baseRev !== null && cur.rev !== req.baseRev) return { ok: false, error: 'conflict', doc: cur };
       const doc = { rev: (cur ? cur.rev : 0) + 1, at: new Date().toISOString(), state: req.state };
       write_(doc);
-      return out_({ ok: true, rev: doc.rev, at: doc.at });
+      return { ok: true, rev: doc.rev, at: doc.at };
     } finally {
       lock.releaseLock();
     }
   }
-  return out_({ ok: false, error: 'action' });
-}
-
-// ブラウザで URL を開いたときの確認用（データは出さない）
-function doGet() {
-  return out_({ ok: true, app: 'kakeibo' });
+  return { ok: false, error: 'action' };
 }
 
 function sheet_() {
